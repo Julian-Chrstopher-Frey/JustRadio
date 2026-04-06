@@ -1,0 +1,18 @@
+bin/
+obj/
+build/
+dist/
+dist-maui*/
+dist-winui/
+dist-winui-*/
+Legacy/
+src/RadioBloom.WinUI/
+src/RadioBloom.Wpf/
+Launch RadioBloom Native.cmd
+*.user
+*.suo
+*.log
+*.xbf
+.vs/
+.idea/
+.DS_Store

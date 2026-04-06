@@ -1,0 +1,277 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="RadioBloom.Maui.MainPage"
+             BackgroundColor="#F4F6F8"
+             Title="JustRadio">
+    <Grid Padding="24" ColumnSpacing="22" RowSpacing="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="2*" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <Border Grid.Row="0" Grid.Column="0" Padding="22" BackgroundColor="#FFFFFF" Stroke="#E3EAF1" StrokeThickness="1">
+            <Border.StrokeShape>
+                <RoundRectangle CornerRadius="24" />
+            </Border.StrokeShape>
+            <Grid ColumnSpacing="20">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="220" />
+                    <ColumnDefinition Width="260" />
+                </Grid.ColumnDefinitions>
+
+                <Border Grid.Column="0" Padding="14" BackgroundColor="#F8FAFC" Stroke="#E3EAF1" StrokeThickness="1">
+                    <Border.StrokeShape>
+                        <RoundRectangle CornerRadius="18" />
+                    </Border.StrokeShape>
+                    <Grid RowSpacing="8">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+                        <Label Text="REGION PREVIEW" FontAttributes="Bold" FontSize="11" CharacterSpacing="2" TextColor="#8794A6" />
+                        <Border Grid.Row="1" HeightRequest="126" StrokeThickness="0" BackgroundColor="#DCEBF4">
+                            <Border.StrokeShape>
+                                <RoundRectangle CornerRadius="16" />
+                            </Border.StrokeShape>
+                            <AbsoluteLayout x:Name="MapLayout" IsClippedToBounds="True">
+                                <GraphicsView x:Name="MapFallbackView"
+                                              AbsoluteLayout.LayoutBounds="0,0,1,1"
+                                              AbsoluteLayout.LayoutFlags="All" />
+                                <AbsoluteLayout x:Name="MapTileLayer"
+                                                AbsoluteLayout.LayoutBounds="0,0,1,1"
+                                                AbsoluteLayout.LayoutFlags="All" />
+                                <BoxView BackgroundColor="#DCEBF4"
+                                         Opacity="0.18"
+                                         AbsoluteLayout.LayoutBounds="0,0,1,1"
+                                         AbsoluteLayout.LayoutFlags="All" />
+                                <Border x:Name="MapLabel"
+                                        Padding="12,5"
+                                        BackgroundColor="#F8FCFF"
+                                        Stroke="#DCEBFA"
+                                        AbsoluteLayout.LayoutBounds="0.08,0.18,190,30"
+                                        AbsoluteLayout.LayoutFlags="PositionProportional">
+                                    <Border.StrokeShape>
+                                        <RoundRectangle CornerRadius="15" />
+                                    </Border.StrokeShape>
+                                    <Label x:Name="MapLabelText" Text="Automatic location" FontAttributes="Bold" FontSize="12" TextColor="#31597C" LineBreakMode="TailTruncation" />
+                                </Border>
+                                <Border x:Name="MapPin"
+                                        WidthRequest="14"
+                                        HeightRequest="14"
+                                        BackgroundColor="#31597C"
+                                        Stroke="#FFFFFF"
+                                        StrokeThickness="2"
+                                        AbsoluteLayout.LayoutBounds="0.53,0.39,14,14"
+                                        AbsoluteLayout.LayoutFlags="PositionProportional">
+                                    <Border.StrokeShape>
+                                        <RoundRectangle CornerRadius="7" />
+                                    </Border.StrokeShape>
+                                </Border>
+                            </AbsoluteLayout>
+                        </Border>
+                    </Grid>
+                </Border>
+
+                <Border Grid.Column="1" Padding="14" BackgroundColor="#F8FAFC" Stroke="#E3EAF1" StrokeThickness="1">
+                    <Border.StrokeShape>
+                        <RoundRectangle CornerRadius="18" />
+                    </Border.StrokeShape>
+                    <Grid RowSpacing="8">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+                        <Label Text="WEATHER" FontAttributes="Bold" FontSize="11" CharacterSpacing="2" TextColor="#8794A6" />
+                        <Border Grid.Row="1" Padding="18,14" BackgroundColor="#F0F6FC" StrokeThickness="0">
+                            <Border.StrokeShape>
+                                <RoundRectangle CornerRadius="16" />
+                            </Border.StrokeShape>
+                            <VerticalStackLayout Spacing="8">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <Label Text="CURRENT" FontAttributes="Bold" FontSize="11" CharacterSpacing="2" TextColor="#8794A6" />
+                                    <Border Grid.Column="1" Padding="10,4" BackgroundColor="#F7FBFF" Stroke="#D8E5F1" StrokeThickness="1">
+                                        <Border.StrokeShape>
+                                            <RoundRectangle CornerRadius="12" />
+                                        </Border.StrokeShape>
+                                        <Label x:Name="WeatherBadgeLabel" Text="Syncing" FontAttributes="Bold" FontSize="11" TextColor="#45637E" />
+                                    </Border>
+                                </Grid>
+                                <Label x:Name="WeatherTempLabel" Text="--" FontAttributes="Bold" FontSize="40" TextColor="#152433" />
+                                <Label x:Name="WeatherConditionLabel" Text="Loading local weather..." FontAttributes="Bold" FontSize="14" TextColor="#334155" LineBreakMode="TailTruncation" />
+                            </VerticalStackLayout>
+                        </Border>
+                    </Grid>
+                </Border>
+
+                <Border Grid.Column="2" Padding="14" BackgroundColor="#F8FAFC" Stroke="#E3EAF1" StrokeThickness="1">
+                    <Border.StrokeShape>
+                        <RoundRectangle CornerRadius="18" />
+                    </Border.StrokeShape>
+                    <VerticalStackLayout Spacing="10">
+                        <Label Text="STATION REGION" FontAttributes="Bold" FontSize="11" CharacterSpacing="2" TextColor="#8794A6" />
+                        <Border Padding="12,0" BackgroundColor="#FFFFFF" Stroke="#DCE5EE" StrokeThickness="1">
+                            <Border.StrokeShape>
+                                <RoundRectangle CornerRadius="13" />
+                            </Border.StrokeShape>
+                            <Border.GestureRecognizers>
+                                <TapGestureRecognizer Tapped="OnCountrySelectorTapped" />
+                            </Border.GestureRecognizers>
+                            <Grid HeightRequest="38" ColumnSpacing="10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <Label x:Name="CountryValueLabel" Text="Country" VerticalOptions="Center" FontSize="14" TextColor="#1F2937" LineBreakMode="TailTruncation" />
+                                <Label Grid.Column="1" Text="v" VerticalOptions="Center" FontSize="12" TextColor="#667085" />
+                            </Grid>
+                        </Border>
+                        <Border Padding="12,0" BackgroundColor="#FFFFFF" Stroke="#DCE5EE" StrokeThickness="1">
+                            <Border.StrokeShape>
+                                <RoundRectangle CornerRadius="13" />
+                            </Border.StrokeShape>
+                            <Border.GestureRecognizers>
+                                <TapGestureRecognizer Tapped="OnRegionSelectorTapped" />
+                            </Border.GestureRecognizers>
+                            <Grid HeightRequest="38" ColumnSpacing="10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <Label x:Name="RegionValueLabel" Text="All regions" VerticalOptions="Center" FontSize="14" TextColor="#1F2937" LineBreakMode="TailTruncation" />
+                                <Label Grid.Column="1" Text="v" VerticalOptions="Center" FontSize="12" TextColor="#667085" />
+                            </Grid>
+                        </Border>
+                        <HorizontalStackLayout Spacing="8">
+                            <Button Text="Apply" HeightRequest="34" CornerRadius="16" BackgroundColor="#111827" TextColor="#FFFFFF" Clicked="OnApplyLocationClicked" />
+                            <Button Text="Auto" HeightRequest="34" CornerRadius="16" BackgroundColor="#FFFFFF" BorderColor="#DCE5EE" BorderWidth="1" TextColor="#34495E" Clicked="OnAutoLocationClicked" />
+                        </HorizontalStackLayout>
+                        <Border x:Name="SelectorDropdown" IsVisible="False" Padding="8" BackgroundColor="#FFFFFF" Stroke="#DCE5EE" StrokeThickness="1">
+                            <Border.StrokeShape>
+                                <RoundRectangle CornerRadius="14" />
+                            </Border.StrokeShape>
+                            <Border.Shadow>
+                                <Shadow Brush="#1A334155" Offset="0,6" Radius="14" Opacity="0.12" />
+                            </Border.Shadow>
+                            <ScrollView MaximumHeightRequest="180" VerticalScrollBarVisibility="Never">
+                                <VerticalStackLayout x:Name="SelectorOptionsPanel" Spacing="4" />
+                            </ScrollView>
+                        </Border>
+                    </VerticalStackLayout>
+                </Border>
+            </Grid>
+        </Border>
+
+        <Border Grid.Row="1" Grid.Column="0" Padding="16" BackgroundColor="#FFFFFF" Stroke="#E3EAF1" StrokeThickness="1">
+            <Border.StrokeShape>
+                <RoundRectangle CornerRadius="22" />
+            </Border.StrokeShape>
+            <VerticalStackLayout Spacing="12">
+                <VerticalStackLayout Spacing="4">
+                    <Label x:Name="SummaryLabel" Text="Loading nearby stations..." FontAttributes="Bold" FontSize="15" TextColor="#40526A" />
+                    <Label x:Name="LocationLabel" Text="Automatic location" FontSize="12" TextColor="#8492A6" />
+                </VerticalStackLayout>
+                <ScrollView Orientation="Horizontal" HorizontalScrollBarVisibility="Never">
+                    <HorizontalStackLayout x:Name="CategoryPanel" Spacing="8" />
+                </ScrollView>
+                <SearchBar x:Name="SearchBox" Placeholder="Search stations" TextChanged="OnSearchTextChanged" BackgroundColor="#F8FAFC" CancelButtonColor="#6B7A90" />
+            </VerticalStackLayout>
+        </Border>
+
+        <Border Grid.Row="2" Grid.Column="0" Padding="12" BackgroundColor="#FFFFFF" Stroke="#E3EAF1" StrokeThickness="1">
+            <Border.StrokeShape>
+                <RoundRectangle CornerRadius="22" />
+            </Border.StrokeShape>
+            <CollectionView x:Name="StationCollection" SelectionMode="Single" SelectionChanged="OnStationSelectionChanged">
+                <CollectionView.ItemTemplate>
+                    <DataTemplate>
+                        <Border Padding="18" Margin="0,0,0,12" BackgroundColor="#FCFDFE" Stroke="#E6ECF3" StrokeThickness="1">
+                            <Border.StrokeShape>
+                                <RoundRectangle CornerRadius="18" />
+                            </Border.StrokeShape>
+                            <Border.Shadow>
+                                <Shadow Brush="#1A334155" Offset="0,2" Radius="8" Opacity="0.16" />
+                            </Border.Shadow>
+                            <Border.GestureRecognizers>
+                                <PointerGestureRecognizer PointerEntered="OnStationPointerEntered" PointerExited="OnStationPointerExited" />
+                            </Border.GestureRecognizers>
+                            <Grid ColumnSpacing="14">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <VerticalStackLayout Spacing="6">
+                                    <Label Text="{Binding Name}" FontAttributes="Bold" FontSize="18" TextColor="#1F2937" />
+                                    <Label Text="{Binding Location}" FontSize="13" TextColor="#667085" />
+                                    <Label Text="{Binding Tagline}" FontSize="14" TextColor="#344054" />
+                                    <Label Text="{Binding MetadataSummary}" FontSize="12" TextColor="#7A8A9E" />
+                                </VerticalStackLayout>
+                                <Border Grid.Column="1" Padding="14,7" BackgroundColor="#EFF5FB" Stroke="#E1E9F2">
+                                    <Border.StrokeShape>
+                                        <RoundRectangle CornerRadius="14" />
+                                    </Border.StrokeShape>
+                                    <Label Text="{Binding Genre}" FontSize="12" TextColor="#42617F" />
+                                </Border>
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+            </CollectionView>
+        </Border>
+
+        <Border Grid.Row="0" Grid.RowSpan="3" Grid.Column="1" Padding="24" BackgroundColor="#FFFFFF" Stroke="#E3EAF1" StrokeThickness="1">
+            <Border.StrokeShape>
+                <RoundRectangle CornerRadius="24" />
+            </Border.StrokeShape>
+            <ScrollView>
+                <VerticalStackLayout Spacing="18">
+                    <Border Padding="14,7" HorizontalOptions="Start" BackgroundColor="#EFF6FF" Stroke="#DCEBFA">
+                        <Border.StrokeShape>
+                            <RoundRectangle CornerRadius="14" />
+                        </Border.StrokeShape>
+                        <Label x:Name="StatusLabel" Text="Ready" FontAttributes="Bold" FontSize="12" TextColor="#31597C" />
+                    </Border>
+                    <Label Text="LISTENING NOW" FontAttributes="Bold" FontSize="11" CharacterSpacing="2" TextColor="#8794A6" />
+                    <Label x:Name="NowTitleLabel" Text="Select a station" FontAttributes="Bold" FontSize="30" TextColor="#17202A" />
+                    <Label x:Name="NowSubtitleLabel" Text="Choose a station from the list." FontSize="14" TextColor="#667085" />
+                    <Border Padding="16" BackgroundColor="#F6FAFE" Stroke="#E3EAF1">
+                        <Border.StrokeShape>
+                            <RoundRectangle CornerRadius="18" />
+                        </Border.StrokeShape>
+                        <VerticalStackLayout Spacing="6">
+                            <Label Text="TRACK" FontAttributes="Bold" FontSize="11" CharacterSpacing="2" TextColor="#8794A6" />
+                            <Label x:Name="TrackLabel" Text="Artist and title will appear here when playback starts." FontSize="15" TextColor="#1F2937" />
+                        </VerticalStackLayout>
+                    </Border>
+                    <Label x:Name="DescriptionLabel" Text="This first MAUI version focuses on cross-platform layout, station loading, and basic playback." FontSize="14" TextColor="#475467" />
+                    <Border Padding="16" BackgroundColor="#F6FAFE" Stroke="#E3EAF1">
+                        <Border.StrokeShape>
+                            <RoundRectangle CornerRadius="18" />
+                        </Border.StrokeShape>
+                        <VerticalStackLayout Spacing="8">
+                            <Label Text="LIVE LEVEL" FontAttributes="Bold" FontSize="11" CharacterSpacing="2" TextColor="#8794A6" />
+                            <GraphicsView x:Name="EqualizerView" HeightRequest="88" />
+                        </VerticalStackLayout>
+                    </Border>
+                    <HorizontalStackLayout Spacing="10">
+                        <Button x:Name="PlayButton" Text="Play" HeightRequest="44" CornerRadius="20" BackgroundColor="#111827" TextColor="#FFFFFF" Clicked="OnPlayClicked" />
+                        <Button x:Name="StopButton" Text="Stop" HeightRequest="44" CornerRadius="20" BackgroundColor="#FFFFFF" BorderColor="#DCE5EE" BorderWidth="1" TextColor="#34495E" Clicked="OnStopClicked" />
+                    </HorizontalStackLayout>
+                    <Label x:Name="SourceLabel" Text="Source metadata will appear here." FontSize="12" TextColor="#77869A" />
+                </VerticalStackLayout>
+            </ScrollView>
+        </Border>
+
+        <WebView x:Name="AudioWebView" Grid.Row="0" Grid.Column="0" HeightRequest="1" WidthRequest="1" Opacity="0.01" InputTransparent="True" />
+    </Grid>
+</ContentPage>
