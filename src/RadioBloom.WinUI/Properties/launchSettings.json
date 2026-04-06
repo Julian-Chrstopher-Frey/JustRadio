@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "RadioBloom WinUI (Package)": {
+      "commandName": "MsixPackage"
+    },
+    "RadioBloom WinUI (Unpackaged)": {
+      "commandName": "Project"
+    }
+  }
+}
