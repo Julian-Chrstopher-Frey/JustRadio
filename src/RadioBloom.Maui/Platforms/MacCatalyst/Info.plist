@@ -17,6 +17,20 @@
 	</array>
 	<key>LSApplicationCategoryType</key>
 	<string>public.app-category.lifestyle</string>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<!-- Allow playback of stations that still expose plain HTTP streams. -->
+		<key>NSAllowsArbitraryLoadsForMedia</key>
+		<true/>
+		<!-- The hidden WebView audio host also needs to fetch those HTTP streams. -->
+		<key>NSAllowsArbitraryLoadsInWebContent</key>
+		<true/>
+	</dict>
+	<key>UIAppFonts</key>
+	<array>
+		<string>OpenSans-Regular.ttf</string>
+		<string>OpenSans-Semibold.ttf</string>
+	</array>
 	<key>UIRequiredDeviceCapabilities</key>
 	<array>
 		<string>arm64</string>
