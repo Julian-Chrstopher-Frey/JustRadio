@@ -21,6 +21,7 @@ public partial class MainPage : ContentPage
 	private CountryOption? _selectedCountry;
 	private string _selectedRegion = StationCatalogService.AllRegionsLabel;
 	private string _selectedCategory = "All";
+	private Action<string>? _selectorOptionSelected;
 	private LocationProfile? _currentLocation;
 	private RadioStation? _selectedStation;
 	private bool _isPlaying;
@@ -28,6 +29,7 @@ public partial class MainPage : ContentPage
 	private int _mapRevision;
 	private int _weatherRevision;
 	private int _playbackRevision;
+	private bool _startupLoadStarted;
 
 	public MainPage()
 	{
@@ -53,7 +55,41 @@ public partial class MainPage : ContentPage
 		};
 		_equalizerTimer.Start();
 		InitializeSelectors();
-		Loaded += async (_, _) => await LoadAutomaticLocationAsync();
+		Loaded += OnMainPageLoaded;
+	}
+
+	private async void OnMainPageLoaded(object? sender, EventArgs e)
+	{
+		if (_startupLoadStarted)
+		{
+			return;
+		}
+
+		_startupLoadStarted = true;
+		try
+		{
+			await LoadAutomaticLocationAsync();
+		}
+		catch
+		{
+			HandleStartupFailure();
+		}
+	}
+
+	private void HandleStartupFailure()
+	{
+		_isPlaying = false;
+		_equalizerDrawable.SetMode(EqualizerMode.Stopped);
+		SummaryLabel.Text = "We couldn't load nearby stations.";
+		LocationLabel.Text = "Use Auto or Apply to try again.";
+		StatusLabel.Text = "Startup error";
+		TrackLabel.Text = "Startup hit an error. Playback is still available after you retry loading stations.";
+		NowTitleLabel.Text = "Select a station";
+		NowSubtitleLabel.Text = "Startup recovery is active.";
+		DescriptionLabel.Text = "The automatic location load failed, but you can still retry with Auto or pick a region manually.";
+		SourceLabel.Text = "Station metadata will appear here after startup completes.";
+		PlayButton.IsEnabled = false;
+		StopButton.IsEnabled = false;
 	}
 
 	private void InitializeSelectors()
@@ -175,19 +211,35 @@ public partial class MainPage : ContentPage
 			.ToList();
 
 		StationCollection.ItemsSource = visible;
-		if (_selectedStation == null || visible.All(station => station.Id != _selectedStation.Id))
+		RadioStation? selectedStation = _selectedStation == null
+			? visible.FirstOrDefault()
+			: visible.FirstOrDefault(station => station.Id == _selectedStation.Id) ?? visible.FirstOrDefault();
+		if (_selectedStation?.Id != selectedStation?.Id)
 		{
 			_suppressSelectionPlayback = true;
 			try
 			{
-				_selectedStation = visible.FirstOrDefault();
-				StationCollection.SelectedItem = _selectedStation;
+				ApplySelectedStation(selectedStation);
 				UpdateDetails();
 			}
 			finally
 			{
 				_suppressSelectionPlayback = false;
 			}
+		}
+		else
+		{
+			ApplySelectedStation(selectedStation);
+			UpdateDetails();
+		}
+	}
+
+	private void ApplySelectedStation(RadioStation? station)
+	{
+		_selectedStation = station;
+		foreach (RadioStation item in _stations)
+		{
+			item.IsSelected = station != null && item.Id == station.Id;
 		}
 	}
 
@@ -218,44 +270,82 @@ public partial class MainPage : ContentPage
 		StopButton.IsEnabled = _isPlaying;
 	}
 
+	private async void OnStationTapped(object? sender, TappedEventArgs e)
+	{
+		if (e.Parameter is not RadioStation station)
+		{
+			return;
+		}
+
+		bool shouldSwitch = !_suppressSelectionPlayback && _selectedStation?.Id != station.Id;
+		ApplySelectedStation(station);
+		UpdateDetails();
+		if (shouldSwitch)
+		{
+			await PlaySelectedAsync();
+		}
+	}
+
 	private async void OnStationPointerEntered(object? sender, PointerEventArgs e)
 	{
-		if (sender is Border border)
+		Border? border = GetStationCardBorder(sender);
+		if (border == null)
 		{
-			border.ZIndex = 10;
-			border.BackgroundColor = Color.FromArgb("#FFFFFF");
-			border.Stroke = Color.FromArgb("#D6E4F2");
-			if (border.Shadow is Shadow shadow)
-			{
-				shadow.Opacity = 0.28f;
-				shadow.Radius = 14;
-				shadow.Offset = new Point(0, 8);
-			}
-
-			await Task.WhenAll(
-				border.ScaleToAsync(1.018, 120, Easing.CubicOut),
-				border.TranslateToAsync(0, -4, 120, Easing.CubicOut));
+			return;
 		}
+
+		if (border.BindingContext is RadioStation station)
+		{
+			station.IsHovered = true;
+		}
+
+		border.ZIndex = 10;
+		if (border.Shadow is Shadow shadow)
+		{
+			shadow.Opacity = 0.28f;
+			shadow.Radius = 14;
+			shadow.Offset = new Point(0, 8);
+		}
+
+		await Task.WhenAll(
+			border.ScaleToAsync(1.018, 120, Easing.CubicOut),
+			border.TranslateToAsync(0, -4, 120, Easing.CubicOut));
 	}
 
 	private async void OnStationPointerExited(object? sender, PointerEventArgs e)
 	{
-		if (sender is Border border)
+		Border? border = GetStationCardBorder(sender);
+		if (border == null)
 		{
-			border.ZIndex = 0;
-			border.BackgroundColor = Color.FromArgb("#FCFDFE");
-			border.Stroke = Color.FromArgb("#E6ECF3");
-			if (border.Shadow is Shadow shadow)
-			{
-				shadow.Opacity = 0.16f;
-				shadow.Radius = 8;
-				shadow.Offset = new Point(0, 2);
-			}
-
-			await Task.WhenAll(
-				border.ScaleToAsync(1.0, 120, Easing.CubicOut),
-				border.TranslateToAsync(0, 0, 120, Easing.CubicOut));
+			return;
 		}
+
+		if (border.BindingContext is RadioStation station)
+		{
+			station.IsHovered = false;
+		}
+
+		border.ZIndex = 0;
+		if (border.Shadow is Shadow shadow)
+		{
+			shadow.Opacity = 0.16f;
+			shadow.Radius = 8;
+			shadow.Offset = new Point(0, 2);
+		}
+
+		await Task.WhenAll(
+			border.ScaleToAsync(1.0, 120, Easing.CubicOut),
+			border.TranslateToAsync(0, 0, 120, Easing.CubicOut));
+	}
+
+	private static Border? GetStationCardBorder(object? sender)
+	{
+		return sender switch
+		{
+			Border border => border,
+			Element { Parent: Border parentBorder } => parentBorder,
+			_ => null
+		};
 	}
 
 	private async void OnApplyLocationClicked(object? sender, EventArgs e)
@@ -314,58 +404,45 @@ public partial class MainPage : ContentPage
 
 	private void ShowSelectorDropdown(IEnumerable<string> options, Action<string> onSelected)
 	{
-		SelectorOptionsPanel.Children.Clear();
-		foreach (string option in options)
+		List<string> selectorOptions = options
+			.Where(option => !string.IsNullOrWhiteSpace(option))
+			.Distinct(StringComparer.Ordinal)
+			.ToList();
+		if (selectorOptions.Count == 0)
 		{
-			Button button = new()
-			{
-				Text = option,
-				HeightRequest = 34,
-				CornerRadius = 12,
-				HorizontalOptions = LayoutOptions.Fill,
-				BackgroundColor = Color.FromArgb("#FFFFFF"),
-				BorderColor = Color.FromArgb("#EDF2F7"),
-				BorderWidth = 1,
-				TextColor = Color.FromArgb("#1F2937"),
-				FontSize = 13,
-				Padding = new Thickness(12, 0)
-			};
-			button.Clicked += (_, _) =>
-			{
-				onSelected(option);
-				HideSelectorDropdown();
-			};
-			SelectorOptionsPanel.Children.Add(button);
+			HideSelectorDropdown();
+			return;
 		}
 
+		_selectorOptionSelected = onSelected;
+		SelectorOptionsView.ItemsSource = selectorOptions;
+		SelectorOptionsView.HeightRequest = Math.Min(180, selectorOptions.Count * 42);
 		SelectorDropdown.IsVisible = true;
+		SelectorOptionsView.ScrollTo(0, position: ScrollToPosition.Start, animate: false);
 	}
 
 	private void HideSelectorDropdown()
 	{
 		SelectorDropdown.IsVisible = false;
-		SelectorOptionsPanel.Children.Clear();
+		SelectorOptionsView.ItemsSource = null;
+		SelectorOptionsView.HeightRequest = -1;
+		_selectorOptionSelected = null;
+	}
+
+	private void OnSelectorOptionTapped(object? sender, TappedEventArgs e)
+	{
+		if (e.Parameter is not string selected || _selectorOptionSelected == null)
+		{
+			return;
+		}
+
+		_selectorOptionSelected(selected);
+		HideSelectorDropdown();
 	}
 
 	private void OnSearchTextChanged(object? sender, TextChangedEventArgs e)
 	{
 		RefreshStations();
-	}
-
-	private async void OnStationSelectionChanged(object? sender, SelectionChangedEventArgs e)
-	{
-		if (e.CurrentSelection.FirstOrDefault() is not RadioStation station)
-		{
-			return;
-		}
-
-		bool shouldSwitch = !_suppressSelectionPlayback && _selectedStation?.Id != station.Id;
-		_selectedStation = station;
-		UpdateDetails();
-		if (shouldSwitch)
-		{
-			await PlaySelectedAsync();
-		}
 	}
 
 	private async void OnPlayClicked(object? sender, EventArgs e)
@@ -412,11 +489,11 @@ public partial class MainPage : ContentPage
 				return;
 			}
 
-			string urlLiteral = JsonSerializer.Serialize(station.StreamUrl);
+			string playbackCandidatesLiteral = JsonSerializer.Serialize(BuildPlaybackCandidates(station));
 			string? result = null;
 			try
 			{
-				result = await AudioWebView.EvaluateJavaScriptAsync($"playStation({urlLiteral})");
+				result = await AudioWebView.EvaluateJavaScriptAsync($"playStation({playbackCandidatesLiteral})");
 			}
 			catch
 			{
@@ -435,7 +512,8 @@ public partial class MainPage : ContentPage
 			}
 
 			_isPlaying = true;
-			_metadataReader.Start(station.StreamUrl);
+			string? playbackUrl = GetPlaybackUrlFromResult(result) ?? station.StreamUrl;
+			_metadataReader.Start(BuildMetadataCandidates(station, playbackUrl), station.Name);
 			_equalizerDrawable.SetMode(EqualizerMode.Live);
 			StatusLabel.Text = "Live";
 			TrackLabel.Text = "Listening for artist and title...";
@@ -449,8 +527,8 @@ public partial class MainPage : ContentPage
 				_isPlaying = false;
 				_metadataReader.Stop();
 				_equalizerDrawable.SetMode(EqualizerMode.Stopped);
-				StatusLabel.Text = "Ready";
-				TrackLabel.Text = "Artist and title will appear here when playback starts.";
+				StatusLabel.Text = "Playback failed";
+				TrackLabel.Text = "This station did not start. Try Restart or choose another stream.";
 				PlayButton.Text = "Play";
 				StopButton.IsEnabled = false;
 			}
@@ -493,6 +571,142 @@ public partial class MainPage : ContentPage
 			&& result.Contains("superseded", StringComparison.OrdinalIgnoreCase);
 	}
 
+	private static string[] BuildPlaybackCandidates(RadioStation station)
+	{
+		IEnumerable<string> baseUrls = station.PlaybackUrls.Count > 0
+			? station.PlaybackUrls
+			: [station.StreamUrl];
+
+		List<string> normalizedBaseUrls = baseUrls
+			.Where(url => !string.IsNullOrWhiteSpace(url))
+			.Distinct(StringComparer.OrdinalIgnoreCase)
+			.ToList();
+		if (normalizedBaseUrls.Count == 0)
+		{
+			return [];
+		}
+
+		bool hasSecureVariant = normalizedBaseUrls.Any(IsSecureStreamUrl);
+		List<string> candidates = [];
+		foreach (string url in normalizedBaseUrls)
+		{
+			if (!hasSecureVariant && TryBuildSecureUpgradeCandidate(url, out string? secureCandidate))
+			{
+				candidates.Add(secureCandidate!);
+			}
+
+			candidates.Add(url);
+		}
+
+		return candidates
+			.Where(candidate => !string.IsNullOrWhiteSpace(candidate))
+			.Distinct(StringComparer.OrdinalIgnoreCase)
+			.ToArray();
+	}
+
+	private static string[] BuildMetadataCandidates(RadioStation station, string? playbackUrl)
+	{
+		IEnumerable<string> baseUrls = station.PlaybackUrls.Count > 0
+			? station.PlaybackUrls
+			: [station.StreamUrl];
+
+		List<string> normalizedBaseUrls = baseUrls
+			.Where(url => !string.IsNullOrWhiteSpace(url))
+			.Distinct(StringComparer.OrdinalIgnoreCase)
+			.ToList();
+		bool hasInsecureVariant = normalizedBaseUrls.Any(url => !IsSecureStreamUrl(url));
+		List<string> candidates = [];
+		foreach (string url in normalizedBaseUrls.OrderBy(url => IsSecureStreamUrl(url) ? 1 : 0))
+		{
+			candidates.Add(url);
+			if (!hasInsecureVariant && TryBuildInsecureMetadataCandidate(url, out string? insecureCandidate))
+			{
+				candidates.Add(insecureCandidate!);
+			}
+		}
+
+		if (!string.IsNullOrWhiteSpace(playbackUrl))
+		{
+			candidates.Add(playbackUrl);
+			if (!hasInsecureVariant && TryBuildInsecureMetadataCandidate(playbackUrl, out string? insecureCandidate))
+			{
+				candidates.Add(insecureCandidate!);
+			}
+		}
+
+		return candidates
+			.Where(url => !string.IsNullOrWhiteSpace(url))
+			.Distinct(StringComparer.OrdinalIgnoreCase)
+			.ToArray();
+	}
+
+	private static bool TryBuildInsecureMetadataCandidate(string url, out string? insecureCandidate)
+	{
+		insecureCandidate = null;
+		if (!Uri.TryCreate(url, UriKind.Absolute, out Uri? uri) ||
+			!string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase) ||
+			!(uri.IsDefaultPort || uri.Port == 443))
+		{
+			return false;
+		}
+
+		UriBuilder builder = new(uri)
+		{
+			Scheme = Uri.UriSchemeHttp,
+			Port = -1
+		};
+		insecureCandidate = builder.Uri.AbsoluteUri;
+		return true;
+	}
+
+	private static bool TryBuildSecureUpgradeCandidate(string url, out string? secureCandidate)
+	{
+		secureCandidate = null;
+		if (!Uri.TryCreate(url, UriKind.Absolute, out Uri? uri) ||
+			!string.Equals(uri.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase) ||
+			!(uri.IsDefaultPort || uri.Port == 80))
+		{
+			return false;
+		}
+
+		UriBuilder builder = new(uri)
+		{
+			Scheme = Uri.UriSchemeHttps,
+			Port = -1
+		};
+		secureCandidate = builder.Uri.AbsoluteUri;
+		return true;
+	}
+
+	private static bool IsSecureStreamUrl(string url)
+	{
+		return Uri.TryCreate(url, UriKind.Absolute, out Uri? uri)
+			&& string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase);
+	}
+
+	private static string? GetPlaybackUrlFromResult(string? result)
+	{
+		if (string.IsNullOrWhiteSpace(result))
+		{
+			return null;
+		}
+
+		string trimmed = result.Trim();
+		if (trimmed.StartsWith('"') && trimmed.EndsWith('"'))
+		{
+			try
+			{
+				return JsonSerializer.Deserialize<string>(trimmed);
+			}
+			catch
+			{
+				return trimmed.Trim('"');
+			}
+		}
+
+		return trimmed;
+	}
+
 	private void OnTrackInfoChanged(string? trackInfo)
 	{
 		MainThread.BeginInvokeOnMainThread(() =>
@@ -505,7 +719,10 @@ public partial class MainPage : ContentPage
 			if (!string.IsNullOrWhiteSpace(trackInfo))
 			{
 				TrackLabel.Text = trackInfo;
+				return;
 			}
+
+			TrackLabel.Text = "Track info unavailable for this station.";
 		});
 	}
 
@@ -746,37 +963,88 @@ public partial class MainPage : ContentPage
 				<meta name="viewport" content="width=device-width, initial-scale=1">
 			</head>
 			<body>
-				<audio id="radio" crossorigin="anonymous"></audio>
+				<audio id="radio"></audio>
 				<script>
 					const radio = document.getElementById('radio');
 					let playToken = 0;
-					function delay(ms) {
-						return new Promise(resolve => setTimeout(resolve, ms));
-					}
-					window.playStation = function(url) {
-						const token = ++playToken;
+					function resetRadio() {
 						radio.pause();
 						radio.removeAttribute('src');
 						radio.load();
-						radio.src = url;
-						radio.preload = 'auto';
-						radio.load();
-						const playPromise = radio.play();
-						if (playPromise && typeof playPromise.catch === 'function') {
-							playPromise.catch(error => {
-								if (token === playToken) {
-									console.log('Radio playback reported asynchronously:', error);
+					}
+					function tryPlayCandidate(url, token) {
+						return new Promise((resolve, reject) => {
+							let settled = false;
+							const cleanup = () => {
+								radio.removeEventListener('playing', onPlaying);
+								radio.removeEventListener('loadedmetadata', onLoadedMetadata);
+								radio.removeEventListener('loadeddata', onLoadedData);
+								radio.removeEventListener('canplay', onCanPlay);
+								radio.removeEventListener('error', onError);
+								radio.removeEventListener('abort', onAbort);
+								clearTimeout(timeoutId);
+							};
+							const finish = (error) => {
+								if (settled) {
+									return;
 								}
-							});
+								settled = true;
+								cleanup();
+								if (token !== playToken) {
+									reject(new Error('superseded'));
+									return;
+								}
+								if (error) {
+									resetRadio();
+									reject(error);
+									return;
+								}
+								resolve(url);
+							};
+							const onPlaying = () => finish(null);
+							const onLoadedMetadata = () => finish(null);
+							const onLoadedData = () => finish(null);
+							const onCanPlay = () => finish(null);
+							const onError = () => finish(new Error('media error'));
+							const onAbort = () => finish(new Error('aborted'));
+							const timeoutId = setTimeout(() => finish(new Error('timeout')), 8000);
+							radio.addEventListener('playing', onPlaying);
+							radio.addEventListener('loadedmetadata', onLoadedMetadata);
+							radio.addEventListener('loadeddata', onLoadedData);
+							radio.addEventListener('canplay', onCanPlay);
+							radio.addEventListener('error', onError);
+							radio.addEventListener('abort', onAbort);
+							resetRadio();
+							radio.preload = 'auto';
+							radio.src = url;
+							radio.load();
+							const playPromise = radio.play();
+							if (playPromise && typeof playPromise.catch === 'function') {
+								playPromise.catch(error => finish(error));
+							}
+						});
+					}
+					window.playStation = async function(urls) {
+						const token = ++playToken;
+						const candidates = Array.isArray(urls) ? urls : [urls];
+						for (const url of candidates) {
+							try {
+								return await tryPlayCandidate(url, token);
+							} catch (error) {
+								if (token === playToken) {
+									console.log('Radio playback candidate failed:', url, error);
+								}
+								if (error && error.message && error.message.includes('superseded')) {
+									throw error;
+								}
+							}
 						}
-						return 'started';
+						throw new Error('No playable stream candidate');
 					};
 					window.stopStation = function() {
 						playToken++;
-						radio.pause();
 						radio.src = '';
-						radio.removeAttribute('src');
-						radio.load();
+						resetRadio();
 						return 'stopped';
 					};
 				</script>

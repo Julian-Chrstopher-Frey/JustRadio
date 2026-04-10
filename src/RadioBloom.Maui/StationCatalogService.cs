@@ -1,8 +1,11 @@
+using System.ComponentModel;
 using System.Globalization;
 using System.Net;
 using System.Runtime.Serialization;
 using System.Runtime.Serialization.Json;
+using System.Runtime.CompilerServices;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace RadioBloom.Maui;
 
@@ -13,8 +16,11 @@ public sealed record LocationProfile(string CountryCode, string CountryName, str
 	public string DisplayName => string.IsNullOrWhiteSpace(Region) ? CountryName : $"{Region}, {CountryName}";
 }
 
-public sealed class RadioStation
+public sealed class RadioStation : INotifyPropertyChanged
 {
+	private bool _isHovered;
+	private bool _isSelected;
+
 	public string Id { get; set; } = string.Empty;
 	public string Name { get; set; } = string.Empty;
 	public string Location { get; set; } = string.Empty;
@@ -24,15 +30,52 @@ public sealed class RadioStation
 	public string Tagline { get; set; } = string.Empty;
 	public string Description { get; set; } = string.Empty;
 	public string StreamUrl { get; set; } = string.Empty;
+	public List<string> PlaybackUrls { get; set; } = [];
 	public string MetadataSummary { get; set; } = string.Empty;
 	public int PopularityScore { get; set; }
+	public bool IsSelected
+	{
+		get => _isSelected;
+		set
+		{
+			if (_isSelected == value)
+			{
+				return;
+			}
+
+			_isSelected = value;
+			OnPropertyChanged();
+		}
+	}
+	public bool IsHovered
+	{
+		get => _isHovered;
+		set
+		{
+			if (_isHovered == value)
+			{
+				return;
+			}
+
+			_isHovered = value;
+			OnPropertyChanged();
+		}
+	}
+
 	public string SearchText => string.Join(" ", Name, Location, Genre, Tagline, Description, MetadataSummary);
+
+	public event PropertyChangedEventHandler? PropertyChanged;
 
 	public bool MatchesCategory(string category)
 	{
 		return string.Equals(category, "Featured", StringComparison.OrdinalIgnoreCase)
 			? Featured
 			: Categories.Contains(category, StringComparer.OrdinalIgnoreCase);
+	}
+
+	private void OnPropertyChanged([CallerMemberName] string? propertyName = null)
+	{
+		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
 	}
 }
 
@@ -68,6 +111,11 @@ public sealed class StationCatalogService
 {
 	public const string AllRegionsLabel = "All regions";
 	private static readonly HttpClient Client = CreateClient();
+	private static readonly HashSet<string> VariantNoiseTokens = new(StringComparer.OrdinalIgnoreCase)
+	{
+		"radio", "live", "stream", "hq", "hd", "aac", "aacp", "mp3", "ogg", "fm", "am",
+		"kbps", "high", "low", "quality", "best", "direct", "player", "official", "alternative", "alt"
+	};
 
 	private static readonly List<CountryOption> Countries = BuildCountryOptions();
 
@@ -172,10 +220,15 @@ public sealed class StationCatalogService
 				raw = await QueryStationsAsync(location.CountryCode, null, 48);
 			}
 
-			List<RadioStation> stations = raw
-				.Where(IsPlayable)
+			List<List<RadioBrowserStation>> variantGroups = BuildVariantGroups(raw);
+			List<RadioStation> stations = variantGroups
 				.Take(64)
-				.Select((station, index) => MapStation(station, location, index))
+				.Select((group, index) => MapStation(
+					ChooseDisplayVariant(group),
+					location,
+					index,
+					BuildPlaybackUrls(group),
+					group.Max(station => station.ClickCount + station.Votes)))
 				.ToList();
 
 			return stations.Count == 0 ? GetFallbackStations() : stations;
@@ -215,7 +268,7 @@ public sealed class StationCatalogService
 		return Deserialize<List<RadioBrowserStation>>(json) ?? [];
 	}
 
-	private static RadioStation MapStation(RadioBrowserStation station, LocationProfile location, int rank)
+	private static RadioStation MapStation(RadioBrowserStation station, LocationProfile location, int rank, List<string> playbackUrls, int popularityScore)
 	{
 		string genre = GetPrimaryTag(station.Tags);
 		string locationLabel = !string.IsNullOrWhiteSpace(station.State)
@@ -232,9 +285,10 @@ public sealed class StationCatalogService
 			Featured = rank < 10,
 			Tagline = BuildTagline(genre, station.Homepage),
 			Description = BuildDescription(station, locationLabel),
-			StreamUrl = station.UrlResolved ?? string.Empty,
+			StreamUrl = playbackUrls.FirstOrDefault() ?? station.UrlResolved ?? string.Empty,
+			PlaybackUrls = playbackUrls,
 			MetadataSummary = BuildMetadataSummary(station),
-			PopularityScore = station.ClickCount + station.Votes
+			PopularityScore = popularityScore
 		};
 	}
 
@@ -246,6 +300,49 @@ public sealed class StationCatalogService
 			!string.IsNullOrWhiteSpace(station.Name) &&
 			!string.IsNullOrWhiteSpace(station.UrlResolved) &&
 			(codec == "MP3" || codec == "AAC" || codec == "AAC+" || codec == "AACP" || codec == "OGG");
+	}
+
+	private static List<List<RadioBrowserStation>> BuildVariantGroups(IEnumerable<RadioBrowserStation> stations)
+	{
+		List<List<RadioBrowserStation>> groups = [];
+		Dictionary<string, List<RadioBrowserStation>> lookup = new(StringComparer.OrdinalIgnoreCase);
+		foreach (RadioBrowserStation station in stations.Where(IsPlayable))
+		{
+			string key = BuildVariantGroupKey(station);
+			if (!lookup.TryGetValue(key, out List<RadioBrowserStation>? group))
+			{
+				group = [];
+				lookup[key] = group;
+				groups.Add(group);
+			}
+
+			group.Add(station);
+		}
+
+		return groups;
+	}
+
+	private static RadioBrowserStation ChooseDisplayVariant(IEnumerable<RadioBrowserStation> variants)
+	{
+		return variants
+			.OrderByDescending(variant => IsSecureStreamUrl(variant.UrlResolved))
+			.ThenByDescending(variant => variant.ClickCount + variant.Votes)
+			.ThenByDescending(variant => variant.Bitrate)
+			.First();
+	}
+
+	private static List<string> BuildPlaybackUrls(IEnumerable<RadioBrowserStation> variants)
+	{
+		List<RadioBrowserStation> variantList = variants.ToList();
+		return BuildOfficialPlaybackUrlOverrides(variantList)
+			.Concat(variantList
+			.Where(variant => !string.IsNullOrWhiteSpace(variant.UrlResolved))
+			.OrderByDescending(variant => IsSecureStreamUrl(variant.UrlResolved))
+			.ThenByDescending(variant => variant.ClickCount + variant.Votes)
+			.ThenByDescending(variant => variant.Bitrate)
+			.Select(variant => variant.UrlResolved!))
+			.Distinct(StringComparer.OrdinalIgnoreCase)
+			.ToList();
 	}
 
 	private static List<RadioStation> GetFallbackStations()
@@ -374,6 +471,103 @@ public sealed class StationCatalogService
 		}
 
 		return uri.Host.StartsWith("www.", StringComparison.OrdinalIgnoreCase) ? uri.Host[4..] : uri.Host;
+	}
+
+	private static string BuildVariantGroupKey(RadioBrowserStation station)
+	{
+		string normalizedName = NormalizeStationName(station.Name);
+		string normalizedHost = NormalizeKeyPart(TryGetHost(station.Homepage) ?? TryGetHost(station.UrlResolved));
+		return string.Join("|", normalizedName, normalizedHost);
+	}
+
+	private static IEnumerable<string> BuildOfficialPlaybackUrlOverrides(IEnumerable<RadioBrowserStation> variants)
+	{
+		List<RadioBrowserStation> variantList = variants.ToList();
+		string[] homepageHosts = variantList
+			.Select(variant => TryGetHost(variant.Homepage))
+			.Where(host => !string.IsNullOrWhiteSpace(host))
+			.Select(host => host!)
+			.Distinct(StringComparer.OrdinalIgnoreCase)
+			.ToArray();
+		string normalizedName = NormalizeStationName(ChooseDisplayVariant(variantList).Name);
+		List<string> urls = [];
+
+		if (homepageHosts.Contains("lora924.de", StringComparer.OrdinalIgnoreCase) &&
+			normalizedName.Contains("lora", StringComparison.OrdinalIgnoreCase))
+		{
+			urls.Add("https://stream.lora924.de:8080/lora-mp3-256.mp3");
+			urls.Add("https://stream.lora924.de:8080/lora-mp3-64.mp3");
+			urls.Add("http://stream.lora924.de:8000/lora-mp3-256.mp3");
+		}
+
+		if (homepageHosts.Contains("radioarabella.de", StringComparer.OrdinalIgnoreCase) &&
+			normalizedName.Contains("arabella", StringComparison.OrdinalIgnoreCase) &&
+			normalizedName.Contains("munchen", StringComparison.OrdinalIgnoreCase))
+		{
+			urls.Add("https://live.stream.radioarabella.de/radioarabella-muenchen/stream/mp3?ref=radioarabella.de");
+		}
+
+		if (homepageHosts.Contains("radiogong.com", StringComparer.OrdinalIgnoreCase) &&
+			normalizedName.Contains("gongwurzburg", StringComparison.OrdinalIgnoreCase))
+		{
+			urls.Add("http://frontend.streamonkey.net/gong-live/stream/mp3?aggregator=user");
+		}
+
+		if (homepageHosts.Contains("986charivari.de", StringComparer.OrdinalIgnoreCase) &&
+			normalizedName.Contains("986charivari", StringComparison.OrdinalIgnoreCase))
+		{
+			urls.Add("http://frontend.streamonkey.net/fhn-986charivari?aggregator=fh-tinyurl");
+		}
+
+		return urls;
+	}
+
+	private static string NormalizeKeyPart(string? value)
+	{
+		if (string.IsNullOrWhiteSpace(value))
+		{
+			return string.Empty;
+		}
+
+		StringBuilder builder = new(value.Length);
+		foreach (char character in value)
+		{
+			if (char.IsLetterOrDigit(character))
+			{
+				builder.Append(char.ToLowerInvariant(character));
+			}
+		}
+
+		return builder.ToString();
+	}
+
+	private static string NormalizeStationName(string? value)
+	{
+		if (string.IsNullOrWhiteSpace(value))
+		{
+			return string.Empty;
+		}
+
+		string normalized = value.Normalize(NormalizationForm.FormD);
+		StringBuilder ascii = new(normalized.Length);
+		foreach (char character in normalized)
+		{
+			if (CharUnicodeInfo.GetUnicodeCategory(character) != UnicodeCategory.NonSpacingMark)
+			{
+				ascii.Append(character);
+			}
+		}
+
+		return string.Concat(
+			Regex.Matches(ascii.ToString(), "[A-Za-z0-9]+")
+				.Select(match => match.Value.ToLowerInvariant())
+				.Where(token => !VariantNoiseTokens.Contains(token)));
+	}
+
+	private static bool IsSecureStreamUrl(string? url)
+	{
+		return Uri.TryCreate(url, UriKind.Absolute, out Uri? uri)
+			&& string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase);
 	}
 
 	private static T? Deserialize<T>(string json)

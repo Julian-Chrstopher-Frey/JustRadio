@@ -15,9 +15,24 @@ internal sealed class StreamMetadataReader : IDisposable
 
 	public void Start(string url)
 	{
+		Start([url], null);
+	}
+
+	public void Start(IEnumerable<string> urls, string? stationName)
+	{
 		Stop();
+		_currentTrackInfo = string.Empty;
+		List<string> candidates = urls
+			.Where(url => !string.IsNullOrWhiteSpace(url))
+			.Distinct(StringComparer.OrdinalIgnoreCase)
+			.ToList();
+		if (candidates.Count == 0)
+		{
+			return;
+		}
+
 		_metadataCts = new CancellationTokenSource();
-		_ = PollTrackInfoAsync(url, _metadataCts.Token);
+		_ = PollTrackInfoAsync(candidates, stationName, _metadataCts.Token);
 	}
 
 	public void Stop()
@@ -44,7 +59,7 @@ internal sealed class StreamMetadataReader : IDisposable
 		Stop();
 	}
 
-	private async Task PollTrackInfoAsync(string url, CancellationToken cancellationToken)
+	private async Task PollTrackInfoAsync(IReadOnlyList<string> urls, string? stationName, CancellationToken cancellationToken)
 	{
 		bool announcedUnavailable = false;
 
@@ -52,7 +67,16 @@ internal sealed class StreamMetadataReader : IDisposable
 		{
 			try
 			{
-				string? trackInfo = await TryReadTrackInfoAsync(url, cancellationToken);
+				string? trackInfo = null;
+				foreach (string url in urls)
+				{
+					trackInfo = await TryReadTrackInfoAsync(url, stationName, cancellationToken);
+					if (!string.IsNullOrWhiteSpace(trackInfo))
+					{
+						break;
+					}
+				}
+
 				if (!string.IsNullOrWhiteSpace(trackInfo))
 				{
 					announcedUnavailable = false;
@@ -91,7 +115,7 @@ internal sealed class StreamMetadataReader : IDisposable
 		}
 	}
 
-	private static async Task<string?> TryReadTrackInfoAsync(string url, CancellationToken cancellationToken)
+	private static async Task<string?> TryReadTrackInfoAsync(string url, string? stationName, CancellationToken cancellationToken)
 	{
 		using HttpRequestMessage request = new(HttpMethod.Get, url);
 		request.Headers.TryAddWithoutValidation("Icy-MetaData", "1");
@@ -124,7 +148,7 @@ internal sealed class StreamMetadataReader : IDisposable
 			byte[] metadataBuffer = await ReadExactAsync(stream, metadataLength, cancellationToken);
 			string metadata = DecodeMetadata(metadataBuffer);
 			string? title = ParseStreamTitle(metadata);
-			if (!string.IsNullOrWhiteSpace(title))
+			if (IsUsefulTrackInfo(title, stationName))
 			{
 				return title;
 			}
@@ -214,6 +238,53 @@ internal sealed class StreamMetadataReader : IDisposable
 		return string.IsNullOrWhiteSpace(title) || string.Equals(title, "-", StringComparison.Ordinal)
 			? null
 			: title;
+	}
+
+	private static bool IsUsefulTrackInfo(string? trackInfo, string? stationName)
+	{
+		if (string.IsNullOrWhiteSpace(trackInfo))
+		{
+			return false;
+		}
+
+		string normalizedTrack = NormalizeForComparison(trackInfo);
+		if (normalizedTrack.Length == 0)
+		{
+			return false;
+		}
+
+		if (!string.IsNullOrWhiteSpace(stationName))
+		{
+			string normalizedStation = NormalizeForComparison(stationName);
+			if (normalizedStation.Length > 0 &&
+				string.Equals(normalizedTrack, normalizedStation, StringComparison.Ordinal))
+			{
+				return false;
+			}
+		}
+
+		return normalizedTrack is not "unknown" and not "onair" and not "live";
+	}
+
+	private static string NormalizeForComparison(string value)
+	{
+		string normalized = value.Normalize(NormalizationForm.FormD);
+		StringBuilder builder = new(normalized.Length);
+		foreach (char character in normalized)
+		{
+			UnicodeCategory category = char.GetUnicodeCategory(character);
+			if (category == UnicodeCategory.NonSpacingMark)
+			{
+				continue;
+			}
+
+			if (char.IsLetterOrDigit(character))
+			{
+				builder.Append(char.ToLowerInvariant(character));
+			}
+		}
+
+		return builder.ToString();
 	}
 
 	private static string DecodeMetadata(byte[] metadataBuffer)
