@@ -1044,6 +1044,7 @@ public partial class MainPage : ContentPage
 					let analyser = null;
 					let sourceNode = null;
 					let frequencyData = null;
+					let analysisEnabled = false;
 					function resetRadio() {
 						radio.pause();
 						radio.removeAttribute('src');
@@ -1079,7 +1080,7 @@ public partial class MainPage : ContentPage
 						}
 					}
 					function buildEqualizerLevels() {
-						if (!analyser || !frequencyData || radio.paused || radio.readyState < 2) {
+						if (!analysisEnabled || !analyser || !frequencyData || radio.paused || radio.readyState < 2) {
 							return '';
 						}
 
@@ -1102,7 +1103,16 @@ public partial class MainPage : ContentPage
 
 						return signal > 0.015 ? JSON.stringify(levels) : '';
 					}
-					function tryPlayCandidate(url, token) {
+					function setAnalysisMode(enabled) {
+						analysisEnabled = enabled;
+						if (enabled) {
+							radio.crossOrigin = 'anonymous';
+						} else {
+							radio.crossOrigin = null;
+							radio.removeAttribute('crossorigin');
+						}
+					}
+					function tryPlayCandidate(url, token, analysisPreferred) {
 						return new Promise((resolve, reject) => {
 							let settled = false;
 							const cleanup = () => {
@@ -1145,6 +1155,7 @@ public partial class MainPage : ContentPage
 							radio.addEventListener('error', onError);
 							radio.addEventListener('abort', onAbort);
 							resetRadio();
+							setAnalysisMode(analysisPreferred);
 							radio.preload = 'auto';
 							radio.src = url;
 							radio.load();
@@ -1160,10 +1171,20 @@ public partial class MainPage : ContentPage
 						const candidates = Array.isArray(urls) ? urls : [urls];
 						for (const url of candidates) {
 							try {
-								return await tryPlayCandidate(url, token);
+								return await tryPlayCandidate(url, token, true);
 							} catch (error) {
 								if (token === playToken) {
-									console.log('Radio playback candidate failed:', url, error);
+									console.log('Radio analysis-enabled candidate failed:', url, error);
+								}
+								if (error && error.message && error.message.includes('superseded')) {
+									throw error;
+								}
+							}
+							try {
+								return await tryPlayCandidate(url, token, false);
+							} catch (error) {
+								if (token === playToken) {
+									console.log('Radio compatibility candidate failed:', url, error);
 								}
 								if (error && error.message && error.message.includes('superseded')) {
 									throw error;
@@ -1177,6 +1198,7 @@ public partial class MainPage : ContentPage
 					};
 					window.stopStation = function() {
 						playToken++;
+						analysisEnabled = false;
 						radio.src = '';
 						resetRadio();
 						return 'stopped';
