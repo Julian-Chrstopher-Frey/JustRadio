@@ -223,75 +223,77 @@
                             ItemSizingStrategy="MeasureFirstItem"
                             VerticalScrollBarVisibility="Always">
                 <CollectionView.ItemsLayout>
-                    <LinearItemsLayout Orientation="Vertical" ItemSpacing="12" />
+                    <LinearItemsLayout Orientation="Vertical" ItemSpacing="0" />
                 </CollectionView.ItemsLayout>
                 <CollectionView.ItemTemplate>
                     <DataTemplate>
-                        <Border Padding="18" BackgroundColor="#FCFDFE" Stroke="#E6ECF3" StrokeThickness="1">
-                            <Border.StrokeShape>
-                                <RoundRectangle CornerRadius="18" />
-                            </Border.StrokeShape>
-                            <Border.Shadow>
-                                <Shadow Brush="#1A334155" Offset="0,2" Radius="8" Opacity="0.16" />
-                            </Border.Shadow>
-                            <Border.Triggers>
-                                <DataTrigger TargetType="Border" Binding="{Binding IsSelected}" Value="True">
-                                    <Setter Property="BackgroundColor" Value="#F7FBFF" />
-                                    <Setter Property="Stroke" Value="#A9CBE3" />
-                                    <Setter Property="StrokeThickness" Value="2" />
-                                </DataTrigger>
-                                <DataTrigger TargetType="Border" Binding="{Binding IsHovered}" Value="True">
-                                    <Setter Property="BackgroundColor" Value="#FFFFFF" />
-                                    <Setter Property="Stroke" Value="#D2E3F0" />
-                                    <Setter Property="StrokeThickness" Value="2" />
-                                </DataTrigger>
-                            </Border.Triggers>
-                            <Border.GestureRecognizers>
-                                <PointerGestureRecognizer PointerEntered="OnStationPointerEntered" PointerExited="OnStationPointerExited" />
-                                <TapGestureRecognizer Tapped="OnStationTapped" CommandParameter="{Binding .}" />
-                            </Border.GestureRecognizers>
-                            <Grid ColumnSpacing="14">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <VerticalStackLayout Spacing="6">
-                                    <Label Text="{Binding Name}" FontAttributes="Bold" FontSize="18" TextColor="#1F2937" LineBreakMode="TailTruncation" MaxLines="1" />
-                                    <Label Text="{Binding Location}" FontSize="13" TextColor="#667085" LineBreakMode="TailTruncation" MaxLines="1" />
-                                    <Label Text="{Binding Tagline}" FontSize="14" TextColor="#344054" LineBreakMode="TailTruncation" MaxLines="1" />
-                                    <Label Text="{Binding MetadataSummary}" FontSize="12" TextColor="#7A8A9E" LineBreakMode="TailTruncation" MaxLines="1" />
-                                </VerticalStackLayout>
-                                <Border Grid.Column="1"
-                                        WidthRequest="120"
-                                        HeightRequest="44"
-                                        Padding="12,0"
-                                        VerticalOptions="Start"
-                                        HorizontalOptions="End"
-                                        BackgroundColor="#EFF5FB"
-                                        Stroke="#E1E9F2">
-                                    <Border.StrokeShape>
-                                        <RoundRectangle CornerRadius="14" />
-                                    </Border.StrokeShape>
-                                    <Border.Triggers>
-                                        <DataTrigger TargetType="Border" Binding="{Binding IsSelected}" Value="True">
-                                            <Setter Property="BackgroundColor" Value="#E4F0FB" />
-                                            <Setter Property="Stroke" Value="#C4D8EA" />
-                                        </DataTrigger>
-                                        <DataTrigger TargetType="Border" Binding="{Binding IsHovered}" Value="True">
-                                            <Setter Property="BackgroundColor" Value="#ECF5FD" />
-                                            <Setter Property="Stroke" Value="#D3E2EF" />
-                                        </DataTrigger>
-                                    </Border.Triggers>
-                                    <Label Text="{Binding Genre}"
-                                           FontSize="12"
-                                           TextColor="#42617F"
-                                           HorizontalTextAlignment="Center"
-                                           VerticalTextAlignment="Center"
-                                           LineBreakMode="TailTruncation"
-                                           MaxLines="1" />
-                                </Border>
-                            </Grid>
-                        </Border>
+                        <Grid Padding="14,6">
+                            <Border Padding="18" BackgroundColor="#FCFDFE" Stroke="#E6ECF3" StrokeThickness="1">
+                                <Border.StrokeShape>
+                                    <RoundRectangle CornerRadius="18" />
+                                </Border.StrokeShape>
+                                <Border.Shadow>
+                                    <Shadow Brush="#1A334155" Offset="0,2" Radius="8" Opacity="0.16" />
+                                </Border.Shadow>
+                                <Border.Triggers>
+                                    <DataTrigger TargetType="Border" Binding="{Binding IsSelected}" Value="True">
+                                        <Setter Property="BackgroundColor" Value="#F7FBFF" />
+                                        <Setter Property="Stroke" Value="#A9CBE3" />
+                                        <Setter Property="StrokeThickness" Value="2" />
+                                    </DataTrigger>
+                                    <DataTrigger TargetType="Border" Binding="{Binding IsHovered}" Value="True">
+                                        <Setter Property="BackgroundColor" Value="#FFFFFF" />
+                                        <Setter Property="Stroke" Value="#D2E3F0" />
+                                        <Setter Property="StrokeThickness" Value="2" />
+                                    </DataTrigger>
+                                </Border.Triggers>
+                                <Border.GestureRecognizers>
+                                    <PointerGestureRecognizer PointerEntered="OnStationPointerEntered" PointerExited="OnStationPointerExited" />
+                                    <TapGestureRecognizer Tapped="OnStationTapped" CommandParameter="{Binding .}" />
+                                </Border.GestureRecognizers>
+                                <Grid ColumnSpacing="14">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <VerticalStackLayout Spacing="6">
+                                        <Label Text="{Binding Name}" FontAttributes="Bold" FontSize="18" TextColor="#1F2937" LineBreakMode="TailTruncation" MaxLines="1" />
+                                        <Label Text="{Binding Location}" FontSize="13" TextColor="#667085" LineBreakMode="TailTruncation" MaxLines="1" />
+                                        <Label Text="{Binding Tagline}" FontSize="14" TextColor="#344054" LineBreakMode="TailTruncation" MaxLines="1" />
+                                        <Label Text="{Binding MetadataSummary}" FontSize="12" TextColor="#7A8A9E" LineBreakMode="TailTruncation" MaxLines="1" />
+                                    </VerticalStackLayout>
+                                    <Border Grid.Column="1"
+                                            WidthRequest="120"
+                                            HeightRequest="44"
+                                            Padding="12,0"
+                                            VerticalOptions="Start"
+                                            HorizontalOptions="End"
+                                            BackgroundColor="#EFF5FB"
+                                            Stroke="#E1E9F2">
+                                        <Border.StrokeShape>
+                                            <RoundRectangle CornerRadius="14" />
+                                        </Border.StrokeShape>
+                                        <Border.Triggers>
+                                            <DataTrigger TargetType="Border" Binding="{Binding IsSelected}" Value="True">
+                                                <Setter Property="BackgroundColor" Value="#E4F0FB" />
+                                                <Setter Property="Stroke" Value="#C4D8EA" />
+                                            </DataTrigger>
+                                            <DataTrigger TargetType="Border" Binding="{Binding IsHovered}" Value="True">
+                                                <Setter Property="BackgroundColor" Value="#ECF5FD" />
+                                                <Setter Property="Stroke" Value="#D3E2EF" />
+                                            </DataTrigger>
+                                        </Border.Triggers>
+                                        <Label Text="{Binding Genre}"
+                                               FontSize="12"
+                                               TextColor="#42617F"
+                                               HorizontalTextAlignment="Center"
+                                               VerticalTextAlignment="Center"
+                                               LineBreakMode="TailTruncation"
+                                               MaxLines="1" />
+                                    </Border>
+                                </Grid>
+                            </Border>
+                        </Grid>
                     </DataTemplate>
                 </CollectionView.ItemTemplate>
             </CollectionView>
