@@ -1073,10 +1073,98 @@ public partial class MainPage : ContentPage
 					let sourceNode = null;
 					let frequencyData = null;
 					let analysisEnabled = false;
+					let activePlayback = null;
+					let reconnectTimer = null;
+					let reconnectInFlight = false;
+					function clearReconnectTimer() {
+						if (reconnectTimer) {
+							clearTimeout(reconnectTimer);
+							reconnectTimer = null;
+						}
+					}
+					function clearActivePlayback() {
+						activePlayback = null;
+						clearReconnectTimer();
+						reconnectInFlight = false;
+					}
 					function resetRadio() {
 						radio.pause();
 						radio.removeAttribute('src');
 						radio.load();
+					}
+					function buildReconnectUrl(url) {
+						try {
+							const parsed = new URL(url);
+							parsed.searchParams.set('_jr_reconnect', Date.now().toString(36));
+							return parsed.toString();
+						} catch {
+							return url;
+						}
+					}
+					function activatePlayback(urls, url, token, analysisPreferred) {
+						activePlayback = {
+							token,
+							url,
+							urls: Array.isArray(urls) ? urls.filter(candidate => !!candidate) : [url],
+							analysisPreferred,
+							reconnectFailures: 0
+						};
+						clearReconnectTimer();
+					}
+					function scheduleReconnect(reason, delayMs) {
+						if (!activePlayback || activePlayback.token !== playToken || reconnectTimer || reconnectInFlight) {
+							return;
+						}
+						const failureDelay = Math.min(6000, activePlayback.reconnectFailures * 900);
+						reconnectTimer = setTimeout(() => {
+							reconnectTimer = null;
+							reconnectPlayback(reason);
+						}, delayMs + failureDelay);
+					}
+					async function reconnectPlayback(reason) {
+						const playback = activePlayback;
+						if (!playback || playback.token !== playToken || reconnectInFlight) {
+							return;
+						}
+
+						reconnectInFlight = true;
+						const urls = [playback.url, ...playback.urls.filter(url => url !== playback.url)];
+						const modes = playback.analysisPreferred ? [true, false] : [false, true];
+						let shouldRetry = false;
+						try {
+							for (const url of urls) {
+								const reconnectUrl = buildReconnectUrl(url);
+								const attemptUrls = reconnectUrl === url ? [url] : [reconnectUrl, url];
+								for (const attemptUrl of attemptUrls) {
+									for (const analysisPreferred of modes) {
+										try {
+											await tryPlayCandidate(attemptUrl, playback.token, analysisPreferred);
+											if (activePlayback && activePlayback.token === playback.token) {
+												activePlayback.url = url;
+												activePlayback.analysisPreferred = analysisPreferred;
+												activePlayback.reconnectFailures = 0;
+											}
+											return;
+										} catch (error) {
+											if (error && error.message && error.message.includes('superseded')) {
+												return;
+											}
+											console.log('Radio reconnect failed:', reason, attemptUrl, error);
+										}
+									}
+								}
+							}
+
+							if (activePlayback && activePlayback.token === playback.token) {
+								activePlayback.reconnectFailures++;
+								shouldRetry = true;
+							}
+						} finally {
+							reconnectInFlight = false;
+							if (shouldRetry) {
+								scheduleReconnect(reason, 1800);
+							}
+						}
 					}
 					function ensureAudioAnalyser() {
 						try {
@@ -1196,10 +1284,13 @@ public partial class MainPage : ContentPage
 					}
 					window.playStation = async function(urls) {
 						const token = ++playToken;
+						clearActivePlayback();
 						const candidates = Array.isArray(urls) ? urls : [urls];
 						for (const url of candidates) {
 							try {
-								return await tryPlayCandidate(url, token, true);
+								const acceptedUrl = await tryPlayCandidate(url, token, true);
+								activatePlayback(candidates, url, token, true);
+								return acceptedUrl;
 							} catch (error) {
 								if (token === playToken) {
 									console.log('Radio analysis-enabled candidate failed:', url, error);
@@ -1209,7 +1300,9 @@ public partial class MainPage : ContentPage
 								}
 							}
 							try {
-								return await tryPlayCandidate(url, token, false);
+								const acceptedUrl = await tryPlayCandidate(url, token, false);
+								activatePlayback(candidates, url, token, false);
+								return acceptedUrl;
 							} catch (error) {
 								if (token === playToken) {
 									console.log('Radio compatibility candidate failed:', url, error);
@@ -1227,10 +1320,20 @@ public partial class MainPage : ContentPage
 					window.stopStation = function() {
 						playToken++;
 						analysisEnabled = false;
+						clearActivePlayback();
 						radio.src = '';
 						resetRadio();
 						return 'stopped';
 					};
+					radio.addEventListener('playing', clearReconnectTimer);
+					radio.addEventListener('timeupdate', () => {
+						if (!radio.paused && !radio.ended) {
+							clearReconnectTimer();
+						}
+					});
+					radio.addEventListener('ended', () => scheduleReconnect('ended', 350));
+					radio.addEventListener('stalled', () => scheduleReconnect('stalled', 3500));
+					radio.addEventListener('error', () => scheduleReconnect('error', 1200));
 				</script>
 			</body>
 			</html>
