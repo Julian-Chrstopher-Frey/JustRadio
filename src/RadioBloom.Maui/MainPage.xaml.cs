@@ -30,6 +30,7 @@ public partial class MainPage : ContentPage
 	private int _weatherRevision;
 	private int _playbackRevision;
 	private bool _startupLoadStarted;
+	private bool _equalizerPollInFlight;
 
 	public MainPage()
 	{
@@ -48,14 +49,43 @@ public partial class MainPage : ContentPage
 		};
 		_equalizerTimer = Dispatcher.CreateTimer();
 		_equalizerTimer.Interval = TimeSpan.FromMilliseconds(120);
-		_equalizerTimer.Tick += (_, _) =>
-		{
-			_equalizerDrawable.Tick();
-			EqualizerView.Invalidate();
-		};
+		_equalizerTimer.Tick += OnEqualizerTimerTick;
 		_equalizerTimer.Start();
 		InitializeSelectors();
 		Loaded += OnMainPageLoaded;
+	}
+
+	private async void OnEqualizerTimerTick(object? sender, EventArgs e)
+	{
+		if (!_isPlaying || _equalizerPollInFlight)
+		{
+			_equalizerDrawable.Tick();
+			EqualizerView.Invalidate();
+			return;
+		}
+
+		_equalizerPollInFlight = true;
+		try
+		{
+			string? result = await AudioWebView.EvaluateJavaScriptAsync("getEqualizerLevels()");
+			if (TryParseEqualizerLevels(result, out float[] levels))
+			{
+				_equalizerDrawable.SetLiveLevels(levels);
+			}
+			else
+			{
+				_equalizerDrawable.Tick();
+			}
+		}
+		catch
+		{
+			_equalizerDrawable.Tick();
+		}
+		finally
+		{
+			_equalizerPollInFlight = false;
+			EqualizerView.Invalidate();
+		}
 	}
 
 	private async void OnMainPageLoaded(object? sender, EventArgs e)
@@ -707,6 +737,49 @@ public partial class MainPage : ContentPage
 		return trimmed;
 	}
 
+	private static bool TryParseEqualizerLevels(string? result, out float[] levels)
+	{
+		levels = [];
+		if (string.IsNullOrWhiteSpace(result))
+		{
+			return false;
+		}
+
+		string payload = result.Trim();
+		if (payload.StartsWith('"') && payload.EndsWith('"'))
+		{
+			try
+			{
+				payload = JsonSerializer.Deserialize<string>(payload) ?? string.Empty;
+			}
+			catch
+			{
+				payload = payload.Trim('"');
+			}
+		}
+
+		if (string.IsNullOrWhiteSpace(payload) || payload == "null" || !payload.StartsWith('['))
+		{
+			return false;
+		}
+
+		try
+		{
+			float[]? parsed = JsonSerializer.Deserialize<float[]>(payload);
+			if (parsed == null || parsed.Length == 0 || parsed.All(level => level <= 0.001f))
+			{
+				return false;
+			}
+
+			levels = parsed;
+			return true;
+		}
+		catch
+		{
+			return false;
+		}
+	}
+
 	private void OnTrackInfoChanged(string? trackInfo)
 	{
 		MainThread.BeginInvokeOnMainThread(() =>
@@ -967,10 +1040,67 @@ public partial class MainPage : ContentPage
 				<script>
 					const radio = document.getElementById('radio');
 					let playToken = 0;
+					let audioContext = null;
+					let analyser = null;
+					let sourceNode = null;
+					let frequencyData = null;
 					function resetRadio() {
 						radio.pause();
 						radio.removeAttribute('src');
 						radio.load();
+					}
+					function ensureAudioAnalyser() {
+						try {
+							const AudioContextType = window.AudioContext || window.webkitAudioContext;
+							if (!AudioContextType) {
+								return false;
+							}
+							if (!audioContext) {
+								audioContext = new AudioContextType();
+							}
+							if (!analyser) {
+								analyser = audioContext.createAnalyser();
+								analyser.fftSize = 64;
+								analyser.smoothingTimeConstant = 0.68;
+								frequencyData = new Uint8Array(analyser.frequencyBinCount);
+							}
+							if (!sourceNode) {
+								sourceNode = audioContext.createMediaElementSource(radio);
+								sourceNode.connect(analyser);
+								analyser.connect(audioContext.destination);
+							}
+							if (audioContext.state === 'suspended') {
+								audioContext.resume().catch(error => console.log('Audio analysis resume failed:', error));
+							}
+							return true;
+						} catch (error) {
+							console.log('Audio analysis unavailable:', error);
+							return false;
+						}
+					}
+					function buildEqualizerLevels() {
+						if (!analyser || !frequencyData || radio.paused || radio.readyState < 2) {
+							return '';
+						}
+
+						analyser.getByteFrequencyData(frequencyData);
+						const bandCount = 18;
+						const levels = [];
+						let signal = 0;
+						for (let band = 0; band < bandCount; band++) {
+							const start = Math.floor(Math.pow(band / bandCount, 1.55) * frequencyData.length);
+							const end = Math.max(start + 1, Math.floor(Math.pow((band + 1) / bandCount, 1.55) * frequencyData.length));
+							let sum = 0;
+							for (let index = start; index < Math.min(end, frequencyData.length); index++) {
+								sum += frequencyData[index];
+							}
+							const average = sum / Math.max(1, end - start);
+							const normalized = Math.max(0, Math.min(1, average / 255));
+							levels.push(normalized);
+							signal += normalized;
+						}
+
+						return signal > 0.015 ? JSON.stringify(levels) : '';
 					}
 					function tryPlayCandidate(url, token) {
 						return new Promise((resolve, reject) => {
@@ -1018,6 +1148,7 @@ public partial class MainPage : ContentPage
 							radio.preload = 'auto';
 							radio.src = url;
 							radio.load();
+							ensureAudioAnalyser();
 							const playPromise = radio.play();
 							if (playPromise && typeof playPromise.catch === 'function') {
 								playPromise.catch(error => finish(error));
@@ -1040,6 +1171,9 @@ public partial class MainPage : ContentPage
 							}
 						}
 						throw new Error('No playable stream candidate');
+					};
+					window.getEqualizerLevels = function() {
+						return buildEqualizerLevels();
 					};
 					window.stopStation = function() {
 						playToken++;

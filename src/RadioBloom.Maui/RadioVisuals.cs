@@ -21,6 +21,23 @@ internal sealed class EqualizerDrawable : IDrawable
 		_mode = mode;
 	}
 
+	public void SetLiveLevels(IReadOnlyList<float> levels)
+	{
+		if (levels.Count == 0)
+		{
+			return;
+		}
+
+		_mode = EqualizerMode.Live;
+		for (int i = 0; i < _levels.Length; i++)
+		{
+			int sourceIndex = (int)Math.Round(i * (levels.Count - 1) / (double)Math.Max(1, _levels.Length - 1));
+			float normalized = Math.Clamp(levels[sourceIndex], 0f, 1f);
+			float target = 0.08f + (MathF.Pow(normalized, 0.72f) * 0.92f);
+			_levels[i] = (_levels[i] * 0.45f) + (target * 0.55f);
+		}
+	}
+
 	public void Tick()
 	{
 		_phase += 0.32;
