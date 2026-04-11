@@ -324,25 +324,36 @@ public sealed class StationCatalogService
 
 	private static RadioBrowserStation ChooseDisplayVariant(IEnumerable<RadioBrowserStation> variants)
 	{
-		return variants
-			.OrderByDescending(variant => IsSecureStreamUrl(variant.UrlResolved))
-			.ThenByDescending(variant => variant.ClickCount + variant.Votes)
-			.ThenByDescending(variant => variant.Bitrate)
-			.First();
+		return OrderByPlaybackPreference(variants).First();
 	}
 
 	private static List<string> BuildPlaybackUrls(IEnumerable<RadioBrowserStation> variants)
 	{
 		List<RadioBrowserStation> variantList = variants.ToList();
 		return BuildOfficialPlaybackUrlOverrides(variantList)
-			.Concat(variantList
-			.Where(variant => !string.IsNullOrWhiteSpace(variant.UrlResolved))
-			.OrderByDescending(variant => IsSecureStreamUrl(variant.UrlResolved))
-			.ThenByDescending(variant => variant.ClickCount + variant.Votes)
-			.ThenByDescending(variant => variant.Bitrate)
-			.Select(variant => variant.UrlResolved!))
+			.Concat(OrderByPlaybackPreference(variantList).Select(variant => variant.UrlResolved!))
 			.Distinct(StringComparer.OrdinalIgnoreCase)
 			.ToList();
+	}
+
+	private static IOrderedEnumerable<RadioBrowserStation> OrderByPlaybackPreference(IEnumerable<RadioBrowserStation> variants)
+	{
+		RadioBrowserStation[] variantArray = variants
+			.Where(variant => !string.IsNullOrWhiteSpace(variant.UrlResolved))
+			.ToArray();
+		string[] homepageHosts = variantArray
+			.Select(variant => TryGetHost(variant.Homepage))
+			.Where(host => !string.IsNullOrWhiteSpace(host))
+			.Select(host => host!)
+			.Distinct(StringComparer.OrdinalIgnoreCase)
+			.ToArray();
+
+		return variantArray
+			.OrderByDescending(GetBrowserPlaybackScore)
+			.ThenByDescending(variant => IsSecureStreamUrl(variant.UrlResolved))
+			.ThenByDescending(variant => GetHomepageHostAffinityScore(variant, homepageHosts))
+			.ThenByDescending(variant => variant.Bitrate)
+			.ThenByDescending(variant => variant.ClickCount + variant.Votes);
 	}
 
 	private static List<RadioStation> GetFallbackStations()
@@ -520,6 +531,61 @@ public sealed class StationCatalogService
 		}
 
 		return urls;
+	}
+
+	private static int GetBrowserPlaybackScore(RadioBrowserStation station)
+	{
+		string codec = (station.Codec ?? string.Empty).Trim().ToUpperInvariant();
+		int score = codec switch
+		{
+			"MP3" => 50,
+			"AAC" => 45,
+			"AAC+" => 45,
+			"AACP" => 45,
+			"OGG" => 20,
+			_ => 0
+		};
+
+		string url = station.UrlResolved ?? string.Empty;
+		if (url.Contains(".mp3", StringComparison.OrdinalIgnoreCase))
+		{
+			score += 8;
+		}
+		if (url.Contains(".aac", StringComparison.OrdinalIgnoreCase) ||
+			url.Contains(".m4a", StringComparison.OrdinalIgnoreCase) ||
+			url.Contains(".mp4", StringComparison.OrdinalIgnoreCase))
+		{
+			score += 6;
+		}
+		if (url.Contains(".flac", StringComparison.OrdinalIgnoreCase))
+		{
+			score -= 15;
+		}
+
+		return score;
+	}
+
+	private static int GetHomepageHostAffinityScore(RadioBrowserStation station, IEnumerable<string> homepageHosts)
+	{
+		string? streamHost = TryGetHost(station.UrlResolved);
+		if (string.IsNullOrWhiteSpace(streamHost))
+		{
+			return 0;
+		}
+
+		foreach (string homepageHost in homepageHosts)
+		{
+			if (string.Equals(streamHost, homepageHost, StringComparison.OrdinalIgnoreCase))
+			{
+				return 3;
+			}
+			if (streamHost.EndsWith("." + homepageHost, StringComparison.OrdinalIgnoreCase))
+			{
+				return 2;
+			}
+		}
+
+		return 0;
 	}
 
 	private static string NormalizeKeyPart(string? value)
