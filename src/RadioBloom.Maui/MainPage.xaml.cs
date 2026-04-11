@@ -44,7 +44,7 @@ public partial class MainPage : ContentPage
 		{
 			if (_currentLocation != null)
 			{
-				UpdateMap(_currentLocation);
+				_ = UpdateMapAsync(_currentLocation);
 			}
 		};
 		_equalizerTimer = Dispatcher.CreateTimer();
@@ -149,7 +149,7 @@ public partial class MainPage : ContentPage
 		SummaryLabel.Text = $"{_stations.Count} stations for {location.DisplayName}.";
 		LocationLabel.Text = location.Source;
 		_currentLocation = location;
-		UpdateMap(location);
+		_ = UpdateMapAsync(location);
 		_ = RefreshWeatherAsync(location);
 		StatusLabel.Text = "Ready";
 	}
@@ -818,8 +818,29 @@ public partial class MainPage : ContentPage
 		WeatherBadgeLabel.Text = "Syncing";
 		WeatherTempLabel.Text = "--";
 		WeatherConditionLabel.Text = "Loading local weather...";
-		(double Latitude, double Longitude) coordinate = LocationCoordinateLookup.Resolve(location);
-		WeatherSnapshot? weather = await WeatherService.GetCurrentAsync(coordinate.Latitude, coordinate.Longitude);
+		(double Latitude, double Longitude)? coordinate = await LocationCoordinateLookup.ResolveAsync(location);
+		if (revision != _weatherRevision)
+		{
+			return;
+		}
+
+		if (coordinate == null)
+		{
+			MainThread.BeginInvokeOnMainThread(() =>
+			{
+				if (revision != _weatherRevision)
+				{
+					return;
+				}
+
+				WeatherBadgeLabel.Text = "Offline";
+				WeatherTempLabel.Text = "--";
+				WeatherConditionLabel.Text = "Location unavailable";
+			});
+			return;
+		}
+
+		WeatherSnapshot? weather = await WeatherService.GetCurrentAsync(coordinate.Value.Latitude, coordinate.Value.Longitude);
 		if (revision != _weatherRevision)
 		{
 			return;
@@ -841,23 +862,30 @@ public partial class MainPage : ContentPage
 		});
 	}
 
-	private void UpdateMap(LocationProfile location)
+	private async Task UpdateMapAsync(LocationProfile location)
 	{
-		(double Latitude, double Longitude) coordinate = LocationCoordinateLookup.Resolve(location);
+		int revision = ++_mapRevision;
 		const double targetX = 0.52;
 		const double targetY = 0.56;
 
 		_mapFallbackDrawable.SetLocation(location.DisplayName);
+		MapTileLayer.Children.Clear();
 		MapFallbackView.Invalidate();
-		RenderMapTiles(location, coordinate.Latitude, coordinate.Longitude, targetX, targetY);
 		MapLabelText.Text = location.DisplayName;
 		AbsoluteLayout.SetLayoutBounds(MapPin, new Rect(targetX, targetY, 14, 14));
 		AbsoluteLayout.SetLayoutBounds(MapLabel, new Rect(Math.Clamp(targetX - 0.02, 0.18, 0.82), Math.Clamp(targetY - 0.18, 0.18, 0.82), 190, 30));
+
+		(double Latitude, double Longitude)? coordinate = await LocationCoordinateLookup.ResolveAsync(location);
+		if (revision != _mapRevision || coordinate == null)
+		{
+			return;
+		}
+
+		RenderMapTiles(location, coordinate.Value.Latitude, coordinate.Value.Longitude, targetX, targetY, revision);
 	}
 
-	private void RenderMapTiles(LocationProfile location, double latitude, double longitude, double targetX, double targetY)
+	private void RenderMapTiles(LocationProfile location, double latitude, double longitude, double targetX, double targetY, int revision)
 	{
-		int revision = ++_mapRevision;
 		List<MapTileRequest> requests = BuildTileRequests(location, latitude, longitude, targetX, targetY);
 		_ = RenderMapTilesAsync(requests, revision);
 	}
