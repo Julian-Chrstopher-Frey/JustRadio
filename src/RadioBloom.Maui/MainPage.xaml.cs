@@ -243,7 +243,7 @@ public partial class MainPage : ContentPage
 		StationCollection.ItemsSource = visible;
 		RadioStation? selectedStation = _selectedStation == null
 			? visible.FirstOrDefault()
-			: visible.FirstOrDefault(station => station.Id == _selectedStation.Id) ?? visible.FirstOrDefault();
+			: _stations.FirstOrDefault(station => station.Id == _selectedStation.Id) ?? visible.FirstOrDefault();
 		if (_selectedStation?.Id != selectedStation?.Id)
 		{
 			_suppressSelectionPlayback = true;
