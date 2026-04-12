@@ -530,6 +530,17 @@ public sealed class StationCatalogService
 			urls.Add("http://frontend.streamonkey.net/fhn-986charivari?aggregator=fh-tinyurl");
 		}
 
+		if (homepageHosts.Contains("plaza.one", StringComparer.OrdinalIgnoreCase) &&
+			normalizedName.Contains("nightwaveplaza", StringComparison.OrdinalIgnoreCase))
+		{
+			urls.Add("https://radio.plaza.one/hls");
+			urls.Add("http://radio.plaza.one/hls");
+			urls.Add("https://radio.plaza.one/mp3");
+			urls.Add("http://radio.plaza.one/mp3");
+			urls.Add("https://radio.plaza.one/opus");
+			urls.Add("http://radio.plaza.one/opus");
+		}
+
 		return urls;
 	}
 

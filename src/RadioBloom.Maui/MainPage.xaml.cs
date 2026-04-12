@@ -1076,15 +1076,24 @@ public partial class MainPage : ContentPage
 					let activePlayback = null;
 					let reconnectTimer = null;
 					let reconnectInFlight = false;
+					let watchdogTimer = null;
+					let lastProgressTime = 0;
 					function clearReconnectTimer() {
 						if (reconnectTimer) {
 							clearTimeout(reconnectTimer);
 							reconnectTimer = null;
 						}
 					}
+					function clearWatchdog() {
+						if (watchdogTimer) {
+							clearInterval(watchdogTimer);
+							watchdogTimer = null;
+						}
+					}
 					function clearActivePlayback() {
 						activePlayback = null;
 						clearReconnectTimer();
+						clearWatchdog();
 						reconnectInFlight = false;
 					}
 					function resetRadio() {
@@ -1109,7 +1118,9 @@ public partial class MainPage : ContentPage
 							analysisPreferred,
 							reconnectFailures: 0
 						};
+						lastProgressTime = Date.now();
 						clearReconnectTimer();
+						ensureWatchdog();
 					}
 					function scheduleReconnect(reason, delayMs) {
 						if (!activePlayback || activePlayback.token !== playToken || reconnectTimer || reconnectInFlight) {
@@ -1165,6 +1176,43 @@ public partial class MainPage : ContentPage
 								scheduleReconnect(reason, 1800);
 							}
 						}
+					}
+					function rememberProgress() {
+						if (!activePlayback || activePlayback.token !== playToken) {
+							return;
+						}
+						lastProgressTime = Date.now();
+						clearReconnectTimer();
+					}
+					function ensureWatchdog() {
+						if (watchdogTimer) {
+							return;
+						}
+						watchdogTimer = setInterval(() => {
+							if (!activePlayback || activePlayback.token !== playToken) {
+								clearWatchdog();
+								return;
+							}
+							if (reconnectInFlight || reconnectTimer) {
+								return;
+							}
+							const idleMs = Date.now() - lastProgressTime;
+							if (radio.ended || radio.error) {
+								scheduleReconnect(radio.ended ? 'watchdog-ended' : 'watchdog-error', 350);
+								return;
+							}
+							if (radio.paused) {
+								scheduleReconnect('watchdog-paused', 900);
+								return;
+							}
+							if (radio.readyState < 2 && idleMs > 8000) {
+								scheduleReconnect('watchdog-buffering', 900);
+								return;
+							}
+							if (idleMs > 25000) {
+								scheduleReconnect('watchdog-idle', 900);
+							}
+						}, 2500);
 					}
 					function ensureAudioAnalyser() {
 						try {
@@ -1328,11 +1376,18 @@ public partial class MainPage : ContentPage
 					radio.addEventListener('playing', clearReconnectTimer);
 					radio.addEventListener('timeupdate', () => {
 						if (!radio.paused && !radio.ended) {
-							clearReconnectTimer();
+							rememberProgress();
 						}
 					});
+					radio.addEventListener('playing', rememberProgress);
+					radio.addEventListener('loadeddata', rememberProgress);
+					radio.addEventListener('canplay', rememberProgress);
 					radio.addEventListener('ended', () => scheduleReconnect('ended', 350));
+					radio.addEventListener('pause', () => scheduleReconnect('pause', 900));
+					radio.addEventListener('waiting', () => scheduleReconnect('waiting', 5000));
 					radio.addEventListener('stalled', () => scheduleReconnect('stalled', 3500));
+					radio.addEventListener('suspend', () => scheduleReconnect('suspend', 9000));
+					radio.addEventListener('emptied', () => scheduleReconnect('emptied', 1200));
 					radio.addEventListener('error', () => scheduleReconnect('error', 1200));
 				</script>
 			</body>
