@@ -6,10 +6,14 @@ namespace RadioBloom.Maui;
 
 public partial class MainPage : ContentPage
 {
+	private const string AllCategory = "All";
+	private const string FavouritesCategory = "Favourites";
 	private static readonly HttpClient MapTileClient = CreateMapTileClient();
 	private static readonly ConcurrentDictionary<string, byte[]> MapTileCache = new(StringComparer.Ordinal);
 	private readonly StationCatalogService _catalog = new();
+	private readonly FavouriteStationStore _favouriteStore = new();
 	private readonly List<RadioStation> _stations = [];
+	private readonly List<RadioStation> _favouriteStations = [];
 	private readonly List<CountryOption> _countries;
 	private readonly Dictionary<string, Button> _categoryButtons = new(StringComparer.OrdinalIgnoreCase);
 	private readonly EqualizerDrawable _equalizerDrawable = new();
@@ -20,10 +24,11 @@ public partial class MainPage : ContentPage
 	private List<string> _regions = [];
 	private CountryOption? _selectedCountry;
 	private string _selectedRegion = StationCatalogService.AllRegionsLabel;
-	private string _selectedCategory = "All";
+	private string _selectedCategory = AllCategory;
 	private Action<string>? _selectorOptionSelected;
 	private LocationProfile? _currentLocation;
 	private RadioStation? _selectedStation;
+	private StationListMode _listMode = StationListMode.Location;
 	private bool _isPlaying;
 	private bool _suppressSelectionPlayback;
 	private int _mapRevision;
@@ -32,9 +37,16 @@ public partial class MainPage : ContentPage
 	private bool _startupLoadStarted;
 	private bool _equalizerPollInFlight;
 
+	private enum StationListMode
+	{
+		Location,
+		Favourites
+	}
+
 	public MainPage()
 	{
 		InitializeComponent();
+		_favouriteStations.AddRange(_favouriteStore.Load());
 		_countries = StationCatalogService.GetCountryOptions();
 		EqualizerView.Drawable = _equalizerDrawable;
 		MapFallbackView.Drawable = _mapFallbackDrawable;
@@ -143,12 +155,12 @@ public partial class MainPage : ContentPage
 		List<RadioStation> stations = await _catalog.LoadStationsAsync(location);
 		_stations.Clear();
 		_stations.AddRange(stations);
-		BuildCategoryButtons();
-		_selectedCategory = "All";
-		RefreshStations();
-		SummaryLabel.Text = $"{_stations.Count} stations for {location.DisplayName}.";
-		LocationLabel.Text = location.Source;
 		_currentLocation = location;
+		SyncFavouriteStates();
+		BuildCategoryButtons();
+		_listMode = StationListMode.Location;
+		_selectedCategory = AllCategory;
+		RefreshStations();
 		_ = UpdateMapAsync(location);
 		_ = RefreshWeatherAsync(location);
 		StatusLabel.Text = "Ready";
@@ -185,7 +197,13 @@ public partial class MainPage : ContentPage
 	{
 		CategoryPanel.Children.Clear();
 		_categoryButtons.Clear();
-		foreach (string category in StationCatalogService.BuildCategoryList(_stations))
+		List<string> categories = StationCatalogService.BuildCategoryList(_stations);
+		if (!categories.Contains(FavouritesCategory, StringComparer.OrdinalIgnoreCase))
+		{
+			categories.Insert(Math.Min(1, categories.Count), FavouritesCategory);
+		}
+
+		foreach (string category in categories)
 		{
 			Button button = new()
 			{
@@ -200,7 +218,17 @@ public partial class MainPage : ContentPage
 			button.Clicked += (_, _) =>
 			{
 				DismissSearchFocus();
-				_selectedCategory = category;
+				if (string.Equals(category, FavouritesCategory, StringComparison.OrdinalIgnoreCase))
+				{
+					_listMode = StationListMode.Favourites;
+					_selectedCategory = AllCategory;
+				}
+				else
+				{
+					_listMode = StationListMode.Location;
+					_selectedCategory = category;
+				}
+
 				UpdateCategoryStyles();
 				RefreshStations(scrollToTop: true);
 			};
@@ -214,7 +242,7 @@ public partial class MainPage : ContentPage
 	{
 		foreach ((string category, Button button) in _categoryButtons)
 		{
-			bool active = string.Equals(category, _selectedCategory, StringComparison.OrdinalIgnoreCase);
+			bool active = IsCategoryButtonActive(category);
 			button.BackgroundColor = Color.FromArgb(active ? "#111827" : "#F4F6F8");
 			button.TextColor = Color.FromArgb(active ? "#FFFFFF" : "#1F2937");
 			button.BorderColor = Color.FromArgb(active ? "#111827" : "#E5E7EB");
@@ -222,11 +250,25 @@ public partial class MainPage : ContentPage
 		}
 	}
 
+	private bool IsCategoryButtonActive(string category)
+	{
+		if (string.Equals(category, FavouritesCategory, StringComparison.OrdinalIgnoreCase))
+		{
+			return _listMode == StationListMode.Favourites;
+		}
+
+		return _listMode == StationListMode.Location &&
+			string.Equals(category, _selectedCategory, StringComparison.OrdinalIgnoreCase);
+	}
+
 	private void RefreshStations(bool scrollToTop = false)
 	{
-		IEnumerable<RadioStation> query = _stations;
+		IEnumerable<RadioStation> query = _listMode == StationListMode.Favourites
+			? _favouriteStations
+			: _stations;
 		string search = SearchBox.Text?.Trim() ?? string.Empty;
-		if (!string.Equals(_selectedCategory, "All", StringComparison.OrdinalIgnoreCase))
+		if (_listMode == StationListMode.Location &&
+			!string.Equals(_selectedCategory, AllCategory, StringComparison.OrdinalIgnoreCase))
 		{
 			query = query.Where(station => station.MatchesCategory(_selectedCategory));
 		}
@@ -242,6 +284,7 @@ public partial class MainPage : ContentPage
 			.ToList();
 
 		StationCollection.ItemsSource = visible;
+		UpdateStationSummary(visible.Count, search);
 		if (scrollToTop && visible.Count > 0)
 		{
 			MainThread.BeginInvokeOnMainThread(() => StationCollection.ScrollTo(0, position: ScrollToPosition.Start, animate: false));
@@ -281,17 +324,74 @@ public partial class MainPage : ContentPage
 			return visibleStation;
 		}
 
-		return _isPlaying
-			? _stations.FirstOrDefault(station => station.Id == _selectedStation.Id) ?? visible.FirstOrDefault()
-			: visible.FirstOrDefault();
+		return _isPlaying ? _selectedStation : visible.FirstOrDefault();
 	}
 
 	private void ApplySelectedStation(RadioStation? station)
 	{
 		_selectedStation = station;
-		foreach (RadioStation item in _stations)
+		foreach (RadioStation item in _stations.Concat(_favouriteStations))
 		{
 			item.IsSelected = station != null && item.Id == station.Id;
+		}
+
+		if (station != null)
+		{
+			station.IsSelected = true;
+			station.IsFavorite = IsFavouriteStation(station.Id);
+		}
+	}
+
+	private void UpdateStationSummary(int visibleCount, string search)
+	{
+		if (_listMode == StationListMode.Favourites)
+		{
+			int total = _favouriteStations.Count;
+			SummaryLabel.Text = string.IsNullOrWhiteSpace(search)
+				? BuildCountText(total, "favourite station", "favourite stations")
+				: $"{visibleCount} of {total} favourite stations.";
+			LocationLabel.Text = "Saved across all regions";
+			return;
+		}
+
+		string scope = _currentLocation?.DisplayName ?? "selected region";
+		bool filtered = !string.Equals(_selectedCategory, AllCategory, StringComparison.OrdinalIgnoreCase) ||
+			!string.IsNullOrWhiteSpace(search);
+		SummaryLabel.Text = filtered
+			? $"{visibleCount} of {_stations.Count} stations for {scope}."
+			: $"{_stations.Count} stations for {scope}.";
+		LocationLabel.Text = _currentLocation?.Source ?? "Automatic location";
+	}
+
+	private static string BuildCountText(int count, string singular, string plural)
+	{
+		return count == 1 ? $"1 {singular}." : $"{count} {plural}.";
+	}
+
+	private bool IsFavouriteStation(string stationId)
+	{
+		return _favouriteStations.Any(station => string.Equals(station.Id, stationId, StringComparison.OrdinalIgnoreCase));
+	}
+
+	private void SyncFavouriteStates()
+	{
+		HashSet<string> favouriteIds = _favouriteStations
+			.Select(station => station.Id)
+			.ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+		foreach (RadioStation station in _favouriteStations)
+		{
+			station.IsFavorite = true;
+		}
+
+		foreach (RadioStation station in _stations)
+		{
+			station.IsFavorite = favouriteIds.Contains(station.Id);
+		}
+
+		if (_selectedStation != null)
+		{
+			_selectedStation.IsFavorite = favouriteIds.Contains(_selectedStation.Id);
 		}
 	}
 
@@ -306,6 +406,7 @@ public partial class MainPage : ContentPage
 			SourceLabel.Text = "Source metadata will appear here.";
 			PlayButton.IsEnabled = false;
 			StopButton.IsEnabled = false;
+			UpdateSelectedFavoriteButton();
 			return;
 		}
 
@@ -320,6 +421,18 @@ public partial class MainPage : ContentPage
 		PlayButton.IsEnabled = true;
 		PlayButton.Text = _isPlaying ? "Restart" : "Play";
 		StopButton.IsEnabled = _isPlaying;
+		UpdateSelectedFavoriteButton();
+	}
+
+	private void UpdateSelectedFavoriteButton()
+	{
+		bool hasStation = _selectedStation != null;
+		bool isFavourite = hasStation && IsFavouriteStation(_selectedStation!.Id);
+		SelectedFavoriteButton.IsEnabled = hasStation;
+		SelectedFavoriteButton.Text = isFavourite ? "Saved" : "Save";
+		SelectedFavoriteButton.BackgroundColor = Color.FromArgb(isFavourite ? "#FFF7ED" : "#FFFFFF");
+		SelectedFavoriteButton.BorderColor = Color.FromArgb(isFavourite ? "#FDBA74" : "#DCE5EE");
+		SelectedFavoriteButton.TextColor = Color.FromArgb(isFavourite ? "#9A3412" : "#34495E");
 	}
 
 	private async void OnStationTapped(object? sender, TappedEventArgs e)
@@ -337,6 +450,68 @@ public partial class MainPage : ContentPage
 		{
 			await PlaySelectedAsync();
 		}
+	}
+
+	private async void OnStationFavoriteClicked(object? sender, EventArgs e)
+	{
+		DismissSearchFocus();
+		if (sender is not Button { CommandParameter: RadioStation station })
+		{
+			return;
+		}
+
+		await ToggleFavouriteAsync(station);
+	}
+
+	private async void OnSelectedFavoriteClicked(object? sender, EventArgs e)
+	{
+		DismissSearchFocus();
+		if (_selectedStation == null)
+		{
+			return;
+		}
+
+		await ToggleFavouriteAsync(_selectedStation);
+	}
+
+	private async Task ToggleFavouriteAsync(RadioStation station)
+	{
+		if (string.IsNullOrWhiteSpace(station.Id))
+		{
+			return;
+		}
+
+		bool saveAsFavourite = !IsFavouriteStation(station.Id);
+		_favouriteStations.RemoveAll(item => string.Equals(item.Id, station.Id, StringComparison.OrdinalIgnoreCase));
+		if (saveAsFavourite)
+		{
+			_favouriteStations.Add(CloneStationForFavourite(station));
+			_favouriteStations.Sort((left, right) => StringComparer.CurrentCultureIgnoreCase.Compare(left.Name, right.Name));
+		}
+
+		SyncFavouriteStates();
+		await _favouriteStore.SaveAsync(_favouriteStations);
+		RefreshStations();
+	}
+
+	private static RadioStation CloneStationForFavourite(RadioStation station)
+	{
+		return new RadioStation
+		{
+			Id = station.Id,
+			Name = station.Name,
+			Location = station.Location,
+			Genre = station.Genre,
+			Categories = station.Categories.ToList(),
+			Featured = station.Featured,
+			Tagline = station.Tagline,
+			Description = station.Description,
+			StreamUrl = station.StreamUrl,
+			PlaybackUrls = station.PlaybackUrls.ToList(),
+			MetadataSummary = station.MetadataSummary,
+			PopularityScore = station.PopularityScore,
+			IsFavorite = true
+		};
 	}
 
 	private async void OnStationPointerEntered(object? sender, PointerEventArgs e)

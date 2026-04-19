@@ -18,6 +18,7 @@ public sealed record LocationProfile(string CountryCode, string CountryName, str
 
 public sealed class RadioStation : INotifyPropertyChanged
 {
+	private bool _isFavorite;
 	private bool _isHovered;
 	private bool _isSelected;
 
@@ -33,6 +34,21 @@ public sealed class RadioStation : INotifyPropertyChanged
 	public List<string> PlaybackUrls { get; set; } = [];
 	public string MetadataSummary { get; set; } = string.Empty;
 	public int PopularityScore { get; set; }
+	public bool IsFavorite
+	{
+		get => _isFavorite;
+		set
+		{
+			if (_isFavorite == value)
+			{
+				return;
+			}
+
+			_isFavorite = value;
+			OnPropertyChanged();
+			OnPropertyChanged(nameof(FavoriteButtonText));
+		}
+	}
 	public bool IsSelected
 	{
 		get => _isSelected;
@@ -61,6 +77,8 @@ public sealed class RadioStation : INotifyPropertyChanged
 			OnPropertyChanged();
 		}
 	}
+
+	public string FavoriteButtonText => IsFavorite ? "Saved" : "Save";
 
 	public string SearchText => string.Join(" ", Name, Location, Genre, Tagline, Description, MetadataSummary);
 

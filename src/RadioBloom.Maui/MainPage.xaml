@@ -298,35 +298,55 @@
                                         <Label Text="{Binding Tagline}" FontSize="14" TextColor="#344054" LineBreakMode="TailTruncation" MaxLines="1" />
                                         <Label Text="{Binding MetadataSummary}" FontSize="12" TextColor="#7A8A9E" LineBreakMode="TailTruncation" MaxLines="1" />
                                     </VerticalStackLayout>
-                                    <Border Grid.Column="1"
-                                            WidthRequest="120"
-                                            HeightRequest="44"
-                                            Padding="12,0"
-                                            VerticalOptions="Start"
-                                            HorizontalOptions="End"
-                                            BackgroundColor="#EFF5FB"
-                                            Stroke="#E1E9F2">
-                                        <Border.StrokeShape>
-                                            <RoundRectangle CornerRadius="14" />
-                                        </Border.StrokeShape>
-                                        <Border.Triggers>
-                                            <DataTrigger TargetType="Border" Binding="{Binding IsSelected}" Value="True">
-                                                <Setter Property="BackgroundColor" Value="#E4F0FB" />
-                                                <Setter Property="Stroke" Value="#C4D8EA" />
-                                            </DataTrigger>
-                                            <DataTrigger TargetType="Border" Binding="{Binding IsHovered}" Value="True">
-                                                <Setter Property="BackgroundColor" Value="#ECF5FD" />
-                                                <Setter Property="Stroke" Value="#D3E2EF" />
-                                            </DataTrigger>
-                                        </Border.Triggers>
-                                        <Label Text="{Binding Genre}"
-                                               FontSize="12"
-                                               TextColor="#42617F"
-                                               HorizontalTextAlignment="Center"
-                                               VerticalTextAlignment="Center"
-                                               LineBreakMode="TailTruncation"
-                                               MaxLines="1" />
-                                    </Border>
+                                    <HorizontalStackLayout Grid.Column="1" Spacing="8" VerticalOptions="Start" HorizontalOptions="End">
+                                        <Button Text="{Binding FavoriteButtonText}"
+                                                WidthRequest="78"
+                                                HeightRequest="44"
+                                                Padding="10,0"
+                                                CornerRadius="14"
+                                                BackgroundColor="#FFFFFF"
+                                                BorderColor="#DCE5EE"
+                                                BorderWidth="1"
+                                                TextColor="#34495E"
+                                                FontAttributes="Bold"
+                                                FontSize="12"
+                                                Clicked="OnStationFavoriteClicked"
+                                                CommandParameter="{Binding .}">
+                                            <Button.Triggers>
+                                                <DataTrigger TargetType="Button" Binding="{Binding IsFavorite}" Value="True">
+                                                    <Setter Property="BackgroundColor" Value="#FFF7ED" />
+                                                    <Setter Property="BorderColor" Value="#FDBA74" />
+                                                    <Setter Property="TextColor" Value="#9A3412" />
+                                                </DataTrigger>
+                                            </Button.Triggers>
+                                        </Button>
+                                        <Border WidthRequest="120"
+                                                HeightRequest="44"
+                                                Padding="12,0"
+                                                BackgroundColor="#EFF5FB"
+                                                Stroke="#E1E9F2">
+                                            <Border.StrokeShape>
+                                                <RoundRectangle CornerRadius="14" />
+                                            </Border.StrokeShape>
+                                            <Border.Triggers>
+                                                <DataTrigger TargetType="Border" Binding="{Binding IsSelected}" Value="True">
+                                                    <Setter Property="BackgroundColor" Value="#E4F0FB" />
+                                                    <Setter Property="Stroke" Value="#C4D8EA" />
+                                                </DataTrigger>
+                                                <DataTrigger TargetType="Border" Binding="{Binding IsHovered}" Value="True">
+                                                    <Setter Property="BackgroundColor" Value="#ECF5FD" />
+                                                    <Setter Property="Stroke" Value="#D3E2EF" />
+                                                </DataTrigger>
+                                            </Border.Triggers>
+                                            <Label Text="{Binding Genre}"
+                                                   FontSize="12"
+                                                   TextColor="#42617F"
+                                                   HorizontalTextAlignment="Center"
+                                                   VerticalTextAlignment="Center"
+                                                   LineBreakMode="TailTruncation"
+                                                   MaxLines="1" />
+                                        </Border>
+                                    </HorizontalStackLayout>
                                 </Grid>
                             </Border>
                         </Grid>
@@ -341,12 +361,32 @@
             </Border.StrokeShape>
             <ScrollView>
                 <VerticalStackLayout Spacing="18">
-                    <Border Padding="14,7" HorizontalOptions="Start" BackgroundColor="#EFF6FF" Stroke="#DCEBFA">
-                        <Border.StrokeShape>
-                            <RoundRectangle CornerRadius="14" />
-                        </Border.StrokeShape>
-                        <Label x:Name="StatusLabel" Text="Ready" FontAttributes="Bold" FontSize="12" TextColor="#31597C" />
-                    </Border>
+                    <Grid ColumnSpacing="10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Border Padding="14,7" HorizontalOptions="Start" BackgroundColor="#EFF6FF" Stroke="#DCEBFA">
+                            <Border.StrokeShape>
+                                <RoundRectangle CornerRadius="14" />
+                            </Border.StrokeShape>
+                            <Label x:Name="StatusLabel" Text="Ready" FontAttributes="Bold" FontSize="12" TextColor="#31597C" />
+                        </Border>
+                        <Button x:Name="SelectedFavoriteButton"
+                                Grid.Column="1"
+                                Text="Save"
+                                IsEnabled="False"
+                                HeightRequest="36"
+                                Padding="14,0"
+                                CornerRadius="16"
+                                BackgroundColor="#FFFFFF"
+                                BorderColor="#DCE5EE"
+                                BorderWidth="1"
+                                TextColor="#34495E"
+                                FontAttributes="Bold"
+                                FontSize="12"
+                                Clicked="OnSelectedFavoriteClicked" />
+                    </Grid>
                     <Label Text="LISTENING NOW" FontAttributes="Bold" FontSize="11" CharacterSpacing="2" TextColor="#8794A6" />
                     <Label x:Name="NowTitleLabel" Text="Select a station" FontAttributes="Bold" FontSize="30" TextColor="#17202A" />
                     <Label x:Name="NowSubtitleLabel" Text="Choose a station from the list." FontSize="14" TextColor="#667085" />
