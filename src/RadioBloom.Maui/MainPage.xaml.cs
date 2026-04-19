@@ -199,6 +199,7 @@ public partial class MainPage : ContentPage
 			};
 			button.Clicked += (_, _) =>
 			{
+				DismissSearchFocus();
 				_selectedCategory = category;
 				UpdateCategoryStyles();
 				RefreshStations(scrollToTop: true);
@@ -323,6 +324,7 @@ public partial class MainPage : ContentPage
 
 	private async void OnStationTapped(object? sender, TappedEventArgs e)
 	{
+		DismissSearchFocus();
 		if (e.Parameter is not RadioStation station)
 		{
 			return;
@@ -401,6 +403,7 @@ public partial class MainPage : ContentPage
 
 	private async void OnApplyLocationClicked(object? sender, EventArgs e)
 	{
+		DismissSearchFocus();
 		HideSelectorDropdown();
 		if (_selectedCountry is not CountryOption country)
 		{
@@ -419,6 +422,7 @@ public partial class MainPage : ContentPage
 
 	private async void OnAutoLocationClicked(object? sender, EventArgs e)
 	{
+		DismissSearchFocus();
 		HideSelectorDropdown();
 		await StopPlaybackAsync();
 		await LoadAutomaticLocationAsync();
@@ -426,6 +430,7 @@ public partial class MainPage : ContentPage
 
 	private void OnCountrySelectorTapped(object? sender, TappedEventArgs e)
 	{
+		DismissSearchFocus();
 		ShowSelectorDropdown(_countries.Select(country => country.DisplayName), selected =>
 		{
 			CountryOption? country = _countries.FirstOrDefault(option => string.Equals(option.DisplayName, selected, StringComparison.Ordinal));
@@ -441,6 +446,7 @@ public partial class MainPage : ContentPage
 
 	private void OnRegionSelectorTapped(object? sender, TappedEventArgs e)
 	{
+		DismissSearchFocus();
 		if (_regions.Count == 0)
 		{
 			return;
@@ -482,6 +488,7 @@ public partial class MainPage : ContentPage
 
 	private void OnSelectorOptionTapped(object? sender, TappedEventArgs e)
 	{
+		DismissSearchFocus();
 		if (e.Parameter is not string selected || _selectorOptionSelected == null)
 		{
 			return;
@@ -497,19 +504,59 @@ public partial class MainPage : ContentPage
 		RefreshStations(scrollToTop: true);
 	}
 
+	private void OnSearchCompleted(object? sender, EventArgs e)
+	{
+		DismissSearchFocus();
+	}
+
 	private void OnClearSearchClicked(object? sender, EventArgs e)
 	{
 		SearchBox.Text = string.Empty;
-		SearchBox.Focus();
+		DismissSearchFocus();
+	}
+
+	private void OnPageTapped(object? sender, TappedEventArgs e)
+	{
+		if (IsTapInsideSearchContainer(e))
+		{
+			return;
+		}
+
+		DismissSearchFocus();
+	}
+
+	private bool IsTapInsideSearchContainer(TappedEventArgs e)
+	{
+		Point? position = e.GetPosition(SearchContainer);
+		if (position == null || SearchContainer.Width <= 0 || SearchContainer.Height <= 0)
+		{
+			return false;
+		}
+
+		Point point = position.Value;
+		return point.X >= 0 &&
+			point.Y >= 0 &&
+			point.X <= SearchContainer.Width &&
+			point.Y <= SearchContainer.Height;
+	}
+
+	private void DismissSearchFocus()
+	{
+		if (SearchBox.IsFocused)
+		{
+			SearchBox.Unfocus();
+		}
 	}
 
 	private async void OnPlayClicked(object? sender, EventArgs e)
 	{
+		DismissSearchFocus();
 		await PlaySelectedAsync();
 	}
 
 	private async void OnStopClicked(object? sender, EventArgs e)
 	{
+		DismissSearchFocus();
 		await StopPlaybackAsync();
 	}
 
