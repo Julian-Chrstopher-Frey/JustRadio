@@ -209,7 +209,39 @@
                 <ScrollView Orientation="Horizontal" HorizontalScrollBarVisibility="Never">
                     <HorizontalStackLayout x:Name="CategoryPanel" Spacing="8" />
                 </ScrollView>
-                <SearchBar x:Name="SearchBox" Placeholder="Search stations" TextChanged="OnSearchTextChanged" BackgroundColor="#F8FAFC" CancelButtonColor="#6B7A90" />
+                <Border Padding="12,0" HeightRequest="44" BackgroundColor="#F8FAFC" Stroke="#DCE5EE" StrokeThickness="1">
+                    <Border.StrokeShape>
+                        <RoundRectangle CornerRadius="14" />
+                    </Border.StrokeShape>
+                    <Grid ColumnSpacing="8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Entry x:Name="SearchBox"
+                               Placeholder="Search stations"
+                               TextChanged="OnSearchTextChanged"
+                               ReturnType="Search"
+                               TextColor="#1F2937"
+                               PlaceholderColor="#8492A6"
+                               BackgroundColor="Transparent"
+                               FontSize="14"
+                               HeightRequest="44"
+                               VerticalOptions="Center" />
+                        <Button x:Name="ClearSearchButton"
+                                Grid.Column="1"
+                                Text="Clear"
+                                IsVisible="False"
+                                HeightRequest="32"
+                                Padding="12,0"
+                                CornerRadius="14"
+                                BackgroundColor="#FFFFFF"
+                                BorderColor="#DCE5EE"
+                                BorderWidth="1"
+                                TextColor="#34495E"
+                                Clicked="OnClearSearchClicked" />
+                    </Grid>
+                </Border>
             </VerticalStackLayout>
         </Border>
 

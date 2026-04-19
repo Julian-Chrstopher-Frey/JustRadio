@@ -201,7 +201,7 @@ public partial class MainPage : ContentPage
 			{
 				_selectedCategory = category;
 				UpdateCategoryStyles();
-				RefreshStations();
+				RefreshStations(scrollToTop: true);
 			};
 			_categoryButtons[category] = button;
 			CategoryPanel.Children.Add(button);
@@ -221,7 +221,7 @@ public partial class MainPage : ContentPage
 		}
 	}
 
-	private void RefreshStations()
+	private void RefreshStations(bool scrollToTop = false)
 	{
 		IEnumerable<RadioStation> query = _stations;
 		string search = SearchBox.Text?.Trim() ?? string.Empty;
@@ -241,9 +241,12 @@ public partial class MainPage : ContentPage
 			.ToList();
 
 		StationCollection.ItemsSource = visible;
-		RadioStation? selectedStation = _selectedStation == null
-			? visible.FirstOrDefault()
-			: _stations.FirstOrDefault(station => station.Id == _selectedStation.Id) ?? visible.FirstOrDefault();
+		if (scrollToTop && visible.Count > 0)
+		{
+			MainThread.BeginInvokeOnMainThread(() => StationCollection.ScrollTo(0, position: ScrollToPosition.Start, animate: false));
+		}
+
+		RadioStation? selectedStation = ResolveSelectedStationForVisibleList(visible);
 		if (_selectedStation?.Id != selectedStation?.Id)
 		{
 			_suppressSelectionPlayback = true;
@@ -262,6 +265,24 @@ public partial class MainPage : ContentPage
 			ApplySelectedStation(selectedStation);
 			UpdateDetails();
 		}
+	}
+
+	private RadioStation? ResolveSelectedStationForVisibleList(IReadOnlyList<RadioStation> visible)
+	{
+		if (_selectedStation == null)
+		{
+			return visible.FirstOrDefault();
+		}
+
+		RadioStation? visibleStation = visible.FirstOrDefault(station => station.Id == _selectedStation.Id);
+		if (visibleStation != null)
+		{
+			return visibleStation;
+		}
+
+		return _isPlaying
+			? _stations.FirstOrDefault(station => station.Id == _selectedStation.Id) ?? visible.FirstOrDefault()
+			: visible.FirstOrDefault();
 	}
 
 	private void ApplySelectedStation(RadioStation? station)
@@ -472,7 +493,14 @@ public partial class MainPage : ContentPage
 
 	private void OnSearchTextChanged(object? sender, TextChangedEventArgs e)
 	{
-		RefreshStations();
+		ClearSearchButton.IsVisible = !string.IsNullOrWhiteSpace(SearchBox.Text);
+		RefreshStations(scrollToTop: true);
+	}
+
+	private void OnClearSearchClicked(object? sender, EventArgs e)
+	{
+		SearchBox.Text = string.Empty;
+		SearchBox.Focus();
 	}
 
 	private async void OnPlayClicked(object? sender, EventArgs e)
