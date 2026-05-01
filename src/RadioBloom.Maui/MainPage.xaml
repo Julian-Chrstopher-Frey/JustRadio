@@ -268,9 +268,6 @@
                                 <Border.StrokeShape>
                                     <RoundRectangle CornerRadius="18" />
                                 </Border.StrokeShape>
-                                <Border.Shadow>
-                                    <Shadow Brush="#1A334155" Offset="0,2" Radius="8" Opacity="0.16" />
-                                </Border.Shadow>
                                 <Border.Triggers>
                                     <DataTrigger TargetType="Border" Binding="{Binding IsSelected}" Value="True">
                                         <Setter Property="BackgroundColor" Value="#F7FBFF" />
@@ -280,7 +277,6 @@
                                     <DataTrigger TargetType="Border" Binding="{Binding IsHovered}" Value="True">
                                         <Setter Property="BackgroundColor" Value="#FFFFFF" />
                                         <Setter Property="Stroke" Value="#D2E3F0" />
-                                        <Setter Property="StrokeThickness" Value="2" />
                                     </DataTrigger>
                                 </Border.Triggers>
                                 <Border.GestureRecognizers>

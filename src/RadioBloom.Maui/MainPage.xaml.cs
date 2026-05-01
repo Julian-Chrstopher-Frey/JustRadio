@@ -60,7 +60,7 @@ public partial class MainPage : ContentPage
 			}
 		};
 		_equalizerTimer = Dispatcher.CreateTimer();
-		_equalizerTimer.Interval = TimeSpan.FromMilliseconds(120);
+		_equalizerTimer.Interval = TimeSpan.FromMilliseconds(180);
 		_equalizerTimer.Tick += OnEqualizerTimerTick;
 		_equalizerTimer.Start();
 		InitializeSelectors();
@@ -514,7 +514,7 @@ public partial class MainPage : ContentPage
 		};
 	}
 
-	private async void OnStationPointerEntered(object? sender, PointerEventArgs e)
+	private void OnStationPointerEntered(object? sender, PointerEventArgs e)
 	{
 		Border? border = GetStationCardBorder(sender);
 		if (border == null)
@@ -528,19 +528,9 @@ public partial class MainPage : ContentPage
 		}
 
 		border.ZIndex = 10;
-		if (border.Shadow is Shadow shadow)
-		{
-			shadow.Opacity = 0.28f;
-			shadow.Radius = 14;
-			shadow.Offset = new Point(0, 8);
-		}
-
-		await Task.WhenAll(
-			border.ScaleToAsync(1.018, 120, Easing.CubicOut),
-			border.TranslateToAsync(0, -4, 120, Easing.CubicOut));
 	}
 
-	private async void OnStationPointerExited(object? sender, PointerEventArgs e)
+	private void OnStationPointerExited(object? sender, PointerEventArgs e)
 	{
 		Border? border = GetStationCardBorder(sender);
 		if (border == null)
@@ -554,16 +544,6 @@ public partial class MainPage : ContentPage
 		}
 
 		border.ZIndex = 0;
-		if (border.Shadow is Shadow shadow)
-		{
-			shadow.Opacity = 0.16f;
-			shadow.Radius = 8;
-			shadow.Offset = new Point(0, 2);
-		}
-
-		await Task.WhenAll(
-			border.ScaleToAsync(1.0, 120, Easing.CubicOut),
-			border.TranslateToAsync(0, 0, 120, Easing.CubicOut));
 	}
 
 	private static Border? GetStationCardBorder(object? sender)
