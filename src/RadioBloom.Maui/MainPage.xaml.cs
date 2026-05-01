@@ -8,6 +8,7 @@ public partial class MainPage : ContentPage
 {
 	private const string AllCategory = "All";
 	private const string FavouritesCategory = "Favourites";
+	private const double CompactLayoutWidth = 1100;
 	private static readonly HttpClient MapTileClient = CreateMapTileClient();
 	private static readonly ConcurrentDictionary<string, byte[]> MapTileCache = new(StringComparer.Ordinal);
 	private readonly StationCatalogService _catalog = new();
@@ -36,6 +37,7 @@ public partial class MainPage : ContentPage
 	private int _playbackRevision;
 	private bool _startupLoadStarted;
 	private bool _equalizerPollInFlight;
+	private bool? _isCompactLayout;
 
 	private enum StationListMode
 	{
@@ -46,6 +48,7 @@ public partial class MainPage : ContentPage
 	public MainPage()
 	{
 		InitializeComponent();
+		SizeChanged += OnMainPageSizeChanged;
 		_favouriteStations.AddRange(_favouriteStore.Load());
 		_countries = StationCatalogService.GetCountryOptions();
 		EqualizerView.Drawable = _equalizerDrawable;
@@ -65,6 +68,106 @@ public partial class MainPage : ContentPage
 		_equalizerTimer.Start();
 		InitializeSelectors();
 		Loaded += OnMainPageLoaded;
+	}
+
+	private void OnMainPageSizeChanged(object? sender, EventArgs e)
+	{
+		UpdateResponsiveLayout(Width);
+	}
+
+	private void UpdateResponsiveLayout(double width)
+	{
+		if (width <= 0)
+		{
+			return;
+		}
+
+		bool compact = width < CompactLayoutWidth;
+		if (_isCompactLayout == compact)
+		{
+			return;
+		}
+
+		_isCompactLayout = compact;
+		if (compact)
+		{
+			ApplyCompactLayout();
+			return;
+		}
+
+		ApplyWideLayout();
+	}
+
+	private void ApplyWideLayout()
+	{
+		RootLayout.Padding = new Thickness(24);
+		RootLayout.ColumnSpacing = 22;
+		RootLayout.RowSpacing = 16;
+		RootLayout.ColumnDefinitions[0].Width = new GridLength(2, GridUnitType.Star);
+		RootLayout.ColumnDefinitions[1].Width = new GridLength(1, GridUnitType.Star);
+		RootLayout.RowDefinitions[2].Height = GridLength.Star;
+		RootLayout.RowDefinitions[3].Height = new GridLength(0);
+
+		Grid.SetRow(OverviewPanel, 0);
+		Grid.SetColumn(OverviewPanel, 0);
+		Grid.SetRow(StationFilterPanel, 1);
+		Grid.SetColumn(StationFilterPanel, 0);
+		Grid.SetRow(StationListPanel, 2);
+		Grid.SetColumn(StationListPanel, 0);
+		Grid.SetRow(NowPlayingPanel, 0);
+		Grid.SetColumn(NowPlayingPanel, 1);
+		Grid.SetRowSpan(NowPlayingPanel, 4);
+		NowPlayingPanel.HeightRequest = -1;
+
+		OverviewPanel.Padding = new Thickness(22);
+		OverviewGrid.ColumnSpacing = 20;
+		OverviewGrid.RowSpacing = 0;
+		OverviewGrid.ColumnDefinitions[0].Width = GridLength.Star;
+		OverviewGrid.ColumnDefinitions[1].Width = new GridLength(220);
+		OverviewGrid.ColumnDefinitions[2].Width = new GridLength(260);
+
+		SetOverviewCardPosition(RegionPreviewCard, 0, 0);
+		SetOverviewCardPosition(WeatherCard, 0, 1);
+		SetOverviewCardPosition(StationRegionCard, 0, 2);
+	}
+
+	private void ApplyCompactLayout()
+	{
+		RootLayout.Padding = new Thickness(16);
+		RootLayout.ColumnSpacing = 0;
+		RootLayout.RowSpacing = 14;
+		RootLayout.ColumnDefinitions[0].Width = GridLength.Star;
+		RootLayout.ColumnDefinitions[1].Width = new GridLength(0);
+		RootLayout.RowDefinitions[2].Height = GridLength.Auto;
+		RootLayout.RowDefinitions[3].Height = GridLength.Star;
+
+		Grid.SetRow(OverviewPanel, 0);
+		Grid.SetColumn(OverviewPanel, 0);
+		Grid.SetRow(StationFilterPanel, 1);
+		Grid.SetColumn(StationFilterPanel, 0);
+		Grid.SetRow(NowPlayingPanel, 2);
+		Grid.SetColumn(NowPlayingPanel, 0);
+		Grid.SetRowSpan(NowPlayingPanel, 1);
+		Grid.SetRow(StationListPanel, 3);
+		Grid.SetColumn(StationListPanel, 0);
+		NowPlayingPanel.HeightRequest = 320;
+
+		OverviewPanel.Padding = new Thickness(16);
+		OverviewGrid.ColumnSpacing = 0;
+		OverviewGrid.RowSpacing = 12;
+		OverviewGrid.ColumnDefinitions[0].Width = GridLength.Star;
+		OverviewGrid.ColumnDefinitions[1].Width = new GridLength(0);
+		OverviewGrid.ColumnDefinitions[2].Width = new GridLength(0);
+
+		SetOverviewCardPosition(RegionPreviewCard, 0, 0);
+		SetOverviewCardPosition(WeatherCard, 1, 0);
+		SetOverviewCardPosition(StationRegionCard, 2, 0);
+	}
+
+	private static void SetOverviewCardPosition(View card, int row, int column)
+	{
+		Grid.SetRow(card, row);
+		Grid.SetColumn(card, column);
 	}
 
 	private async void OnEqualizerTimerTick(object? sender, EventArgs e)
@@ -108,6 +211,7 @@ public partial class MainPage : ContentPage
 		}
 
 		_startupLoadStarted = true;
+		UpdateResponsiveLayout(Width);
 		try
 		{
 			await LoadAutomaticLocationAsync();

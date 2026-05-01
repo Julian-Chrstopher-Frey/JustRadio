@@ -12,24 +12,30 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
+            <RowDefinition Height="0" />
         </Grid.RowDefinitions>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="2*" />
             <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
 
-        <Border Grid.Row="0" Grid.Column="0" Padding="22" BackgroundColor="#FFFFFF" Stroke="#E3EAF1" StrokeThickness="1">
+        <Border x:Name="OverviewPanel" Grid.Row="0" Grid.Column="0" Padding="22" BackgroundColor="#FFFFFF" Stroke="#E3EAF1" StrokeThickness="1">
             <Border.StrokeShape>
                 <RoundRectangle CornerRadius="24" />
             </Border.StrokeShape>
-            <Grid ColumnSpacing="20">
+            <Grid x:Name="OverviewGrid" ColumnSpacing="20">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="220" />
                     <ColumnDefinition Width="260" />
                 </Grid.ColumnDefinitions>
 
-                <Border Grid.Column="0" Padding="14" BackgroundColor="#F8FAFC" Stroke="#E3EAF1" StrokeThickness="1">
+                <Border x:Name="RegionPreviewCard" Grid.Column="0" Padding="14" BackgroundColor="#F8FAFC" Stroke="#E3EAF1" StrokeThickness="1">
                     <Border.StrokeShape>
                         <RoundRectangle CornerRadius="18" />
                     </Border.StrokeShape>
@@ -82,7 +88,7 @@
                     </Grid>
                 </Border>
 
-                <Border Grid.Column="1" Padding="14" BackgroundColor="#F8FAFC" Stroke="#E3EAF1" StrokeThickness="1">
+                <Border x:Name="WeatherCard" Grid.Column="1" Padding="14" BackgroundColor="#F8FAFC" Stroke="#E3EAF1" StrokeThickness="1">
                     <Border.StrokeShape>
                         <RoundRectangle CornerRadius="18" />
                     </Border.StrokeShape>
@@ -117,7 +123,7 @@
                     </Grid>
                 </Border>
 
-                <Border Grid.Column="2" Padding="14" BackgroundColor="#F8FAFC" Stroke="#E3EAF1" StrokeThickness="1">
+                <Border x:Name="StationRegionCard" Grid.Column="2" Padding="14" BackgroundColor="#F8FAFC" Stroke="#E3EAF1" StrokeThickness="1">
                     <Border.StrokeShape>
                         <RoundRectangle CornerRadius="18" />
                     </Border.StrokeShape>
@@ -200,7 +206,7 @@
             </Grid>
         </Border>
 
-        <Border Grid.Row="1" Grid.Column="0" Padding="16" BackgroundColor="#FFFFFF" Stroke="#E3EAF1" StrokeThickness="1">
+        <Border x:Name="StationFilterPanel" Grid.Row="1" Grid.Column="0" Padding="16" BackgroundColor="#FFFFFF" Stroke="#E3EAF1" StrokeThickness="1">
             <Border.StrokeShape>
                 <RoundRectangle CornerRadius="22" />
             </Border.StrokeShape>
@@ -249,7 +255,7 @@
             </VerticalStackLayout>
         </Border>
 
-        <Border Grid.Row="2" Grid.Column="0" Padding="12" BackgroundColor="#FFFFFF" Stroke="#E3EAF1" StrokeThickness="1">
+        <Border x:Name="StationListPanel" Grid.Row="2" Grid.Column="0" Padding="12" BackgroundColor="#FFFFFF" Stroke="#E3EAF1" StrokeThickness="1">
             <Border.StrokeShape>
                 <RoundRectangle CornerRadius="22" />
             </Border.StrokeShape>
@@ -351,7 +357,7 @@
             </CollectionView>
         </Border>
 
-        <Border Grid.Row="0" Grid.RowSpan="3" Grid.Column="1" Padding="24" BackgroundColor="#FFFFFF" Stroke="#E3EAF1" StrokeThickness="1">
+        <Border x:Name="NowPlayingPanel" Grid.Row="0" Grid.RowSpan="4" Grid.Column="1" Padding="24" BackgroundColor="#FFFFFF" Stroke="#E3EAF1" StrokeThickness="1">
             <Border.StrokeShape>
                 <RoundRectangle CornerRadius="24" />
             </Border.StrokeShape>
